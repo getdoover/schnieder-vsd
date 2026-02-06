@@ -1,51 +1,152 @@
 {
     "schnieder_vsd": {
         "name": "schnieder_vsd",
-        "display_name": "schnieder-vsd",
+        "display_name": "Schnieder VSD",
         "type": "DEV",
         "visibility": "PUB",
         "allow_many": true,
         "description": "Schneider VSD control",
         "long_description": "README.md",
         "depends_on": [],
-        "owner_org_key": "FIX-ME",
-        "image_name": "ghcr.io/getdoover/schnieder-vsd:main",
-        "container_registry_profile_key": "FIX-ME",
+        "owner_org_key": "",
+        "image_name": "ghcr.io/getdoover/schnieder_vsd:main",
+        "container_registry_profile_key": "",
         "build_args": "--platform linux/amd64,linux/arm64",
+        "lambda_config": {},
+        "organisation_id": null,
+        "key": null,
+        "owner_org_id": null,
+        "code_repo_id": null,
+        "container_registry_profile_id": null,
+        "repo_branch": "main",
+        "icon_url": "https://companieslogo.com/img/orig/SU.PA-45fa0b74.svg",
+        "staging_config": {},
+        "export_config_command": null,
+        "run_command": null,
+        "lambda_arn": null,
         "config_schema": {
             "$schema": "https://json-schema.org/draft/2020-12/schema",
             "$id": "",
             "title": "Application Config",
             "type": "object",
             "properties": {
-                "digital_outputs_enabled": {
-                    "title": "Digital Outputs Enabled",
-                    "x-name": "digital_outputs_enabled",
-                    "x-hidden": false,
-                    "type": "boolean",
-                    "default": true
-                },
-                "a_funny_message": {
-                    "title": "A Funny Message",
-                    "x-name": "a_funny_message",
-                    "x-hidden": false,
-                    "type": "string"
-                },
-                "simulator_app_key": {
-                    "format": "doover-application",
-                    "title": "Simulator App Key",
-                    "x-name": "simulator_app_key",
+                "display_name": {
+                    "title": "Display Name",
+                    "x-name": "display_name",
                     "x-hidden": false,
                     "type": "string",
-                    "description": "The app key for the simulator"
+                    "description": "Name shown in the UI for this VSD",
+                    "default": "Schneider VSD"
+                },
+                "modbus_host": {
+                    "title": "Modbus Host",
+                    "x-name": "modbus_host",
+                    "x-hidden": false,
+                    "type": "string",
+                    "description": "IP address or hostname of the Modbus TCP gateway",
+                    "default": "192.168.1.100"
+                },
+                "modbus_port": {
+                    "title": "Modbus Port",
+                    "x-name": "modbus_port",
+                    "x-hidden": false,
+                    "type": "integer",
+                    "description": "Modbus TCP port (default 502)",
+                    "default": 502
+                },
+                "modbus_unit_id": {
+                    "title": "Modbus Unit ID",
+                    "x-name": "modbus_unit_id",
+                    "x-hidden": false,
+                    "type": "integer",
+                    "description": "Modbus slave/unit ID of the VSD",
+                    "default": 1
+                },
+                "connection_timeout": {
+                    "title": "Connection Timeout",
+                    "x-name": "connection_timeout",
+                    "x-hidden": false,
+                    "type": "number",
+                    "description": "Timeout for Modbus connection in seconds",
+                    "default": 5.0
+                },
+                "maximum_frequency_(hz)": {
+                    "title": "Maximum Frequency (Hz)",
+                    "x-name": "maximum_frequency_(hz)",
+                    "x-hidden": false,
+                    "type": "number",
+                    "description": "Maximum allowed frequency setpoint",
+                    "default": 50.0
+                },
+                "minimum_frequency_(hz)": {
+                    "title": "Minimum Frequency (Hz)",
+                    "x-name": "minimum_frequency_(hz)",
+                    "x-hidden": false,
+                    "type": "number",
+                    "description": "Minimum allowed frequency setpoint",
+                    "default": 0.0
+                },
+                "acceleration_time_(s)": {
+                    "title": "Acceleration Time (s)",
+                    "x-name": "acceleration_time_(s)",
+                    "x-hidden": false,
+                    "type": "number",
+                    "description": "Time to accelerate from 0 to max frequency",
+                    "default": 10.0
+                },
+                "deceleration_time_(s)": {
+                    "title": "Deceleration Time (s)",
+                    "x-name": "deceleration_time_(s)",
+                    "x-hidden": false,
+                    "type": "number",
+                    "description": "Time to decelerate from max frequency to 0",
+                    "default": 10.0
+                },
+                "enable_remote_control": {
+                    "title": "Enable Remote Control",
+                    "x-name": "enable_remote_control",
+                    "x-hidden": false,
+                    "type": "boolean",
+                    "description": "Allow remote start/stop commands",
+                    "default": false
+                },
+                "enable_speed_control": {
+                    "title": "Enable Speed Control",
+                    "x-name": "enable_speed_control",
+                    "x-hidden": false,
+                    "type": "boolean",
+                    "description": "Allow remote frequency/speed changes",
+                    "default": false
+                },
+                "poll_interval_(s)": {
+                    "title": "Poll Interval (s)",
+                    "x-name": "poll_interval_(s)",
+                    "x-hidden": false,
+                    "type": "number",
+                    "description": "Interval between status polls",
+                    "default": 1.0
+                },
+                "overcurrent_threshold_(%)": {
+                    "title": "Overcurrent Threshold (%)",
+                    "x-name": "overcurrent_threshold_(%)",
+                    "x-hidden": false,
+                    "type": "number",
+                    "description": "Current threshold for overcurrent warning (% of nominal)",
+                    "default": 110.0
+                },
+                "overtemperature_threshold_(c)": {
+                    "title": "Overtemperature Threshold (C)",
+                    "x-name": "overtemperature_threshold_(c)",
+                    "x-hidden": false,
+                    "type": "number",
+                    "description": "Temperature threshold for overtemperature warning",
+                    "default": 80.0
                 }
             },
             "additionalElements": true,
-            "required": [
-                "a_funny_message",
-                "simulator_app_key"
-            ]
+            "required": []
         },
-        "organisation_id": "FIX-ME"
+        "id": "145351896956176644",
+        "banner_url": null
     }
 }
