@@ -1,6 +1,14 @@
 {
-    "simulator_app_key": "sim_app_key",
-    "digital_input_count": 1,
-    "digital_output_count": 2,
-    "a_funny_message": "yeeha"
+    "vsd_type": "atv600",
+    "modbus_host": "127.0.0.1",
+    "modbus_port": 5020,
+    "modbus_unit_id": 1,
+    "max_frequency_hz": 50.0,
+    "min_frequency_hz": 0.0,
+    "amps_divisor": 10,
+    "max_amps": 50.0,
+    "terminal_mode_label": "Float Switch",
+    "di_1_name": "Float Switch",
+    "di_2_name": "Pressure Switch",
+    "di_3_name": "Fault Trigger"
 }

@@ -1,15 +1,15 @@
 {
-    "schnieder_vsd": {
-        "name": "schnieder_vsd",
-        "display_name": "Schnieder VSD",
+    "schneider_vsd": {
+        "name": "schneider_vsd",
+        "display_name": "Schneider VSD",
         "type": "DEV",
         "visibility": "PUB",
         "allow_many": true,
-        "description": "Schneider VSD control",
+        "description": "Schneider Altivar VSD monitoring and control",
         "long_description": "README.md",
         "depends_on": [],
         "owner_org_key": "",
-        "image_name": "ghcr.io/getdoover/schnieder_vsd:main",
+        "image_name": "ghcr.io/getdoover/schneider_vsd:main",
         "container_registry_profile_key": "",
         "build_args": "--platform linux/amd64,linux/arm64",
         "lambda_config": {},
@@ -24,129 +24,213 @@
         "export_config_command": null,
         "run_command": null,
         "lambda_arn": null,
+        "id": "145351896956176644",
+        "banner_url": null,
         "config_schema": {
             "$schema": "https://json-schema.org/draft/2020-12/schema",
             "$id": "",
-            "title": "Application Config",
+            "title": "$default",
             "type": "object",
             "properties": {
-                "display_name": {
-                    "title": "Display Name",
-                    "x-name": "display_name",
+                "vsd_type": {
+                    "enum": [
+                        "atv600"
+                    ],
+                    "title": "VSD Type",
+                    "x-name": "vsd_type",
                     "x-hidden": false,
-                    "type": "string",
-                    "description": "Name shown in the UI for this VSD",
-                    "default": "Schneider VSD"
+                    "type": [
+                        "string",
+                        "null"
+                    ],
+                    "x-required": false,
+                    "description": "Schneider Altivar model",
+                    "default": "atv600",
+                    "x-position": 0
                 },
                 "modbus_host": {
                     "title": "Modbus Host",
                     "x-name": "modbus_host",
                     "x-hidden": false,
-                    "type": "string",
-                    "description": "IP address or hostname of the Modbus TCP gateway",
-                    "default": "192.168.1.100"
+                    "type": [
+                        "string",
+                        "null"
+                    ],
+                    "x-required": false,
+                    "description": "IP address or hostname of the VSD",
+                    "default": "192.168.1.100",
+                    "x-position": 1
                 },
                 "modbus_port": {
                     "title": "Modbus Port",
                     "x-name": "modbus_port",
                     "x-hidden": false,
-                    "type": "integer",
-                    "description": "Modbus TCP port (default 502)",
-                    "default": 502
+                    "type": [
+                        "integer",
+                        "null"
+                    ],
+                    "x-required": false,
+                    "default": 502,
+                    "x-position": 2
                 },
                 "modbus_unit_id": {
                     "title": "Modbus Unit ID",
                     "x-name": "modbus_unit_id",
                     "x-hidden": false,
-                    "type": "integer",
-                    "description": "Modbus slave/unit ID of the VSD",
-                    "default": 1
+                    "type": [
+                        "integer",
+                        "null"
+                    ],
+                    "x-required": false,
+                    "default": 1,
+                    "x-position": 3,
+                    "minimum": 1,
+                    "maximum": 247
                 },
-                "connection_timeout": {
-                    "title": "Connection Timeout",
-                    "x-name": "connection_timeout",
+                "max_frequency_hz": {
+                    "title": "Max Frequency (Hz)",
+                    "x-name": "max_frequency_hz",
                     "x-hidden": false,
-                    "type": "number",
-                    "description": "Timeout for Modbus connection in seconds",
-                    "default": 5.0
-                },
-                "maximum_frequency_(hz)": {
-                    "title": "Maximum Frequency (Hz)",
-                    "x-name": "maximum_frequency_(hz)",
-                    "x-hidden": false,
-                    "type": "number",
+                    "type": [
+                        "number",
+                        "null"
+                    ],
+                    "x-required": false,
                     "description": "Maximum allowed frequency setpoint",
-                    "default": 50.0
+                    "default": 50.0,
+                    "x-position": 4
                 },
-                "minimum_frequency_(hz)": {
-                    "title": "Minimum Frequency (Hz)",
-                    "x-name": "minimum_frequency_(hz)",
+                "min_frequency_hz": {
+                    "title": "Min Frequency (Hz)",
+                    "x-name": "min_frequency_hz",
                     "x-hidden": false,
-                    "type": "number",
+                    "type": [
+                        "number",
+                        "null"
+                    ],
+                    "x-required": false,
                     "description": "Minimum allowed frequency setpoint",
-                    "default": 0.0
+                    "default": 0.0,
+                    "x-position": 5
                 },
-                "acceleration_time_(s)": {
-                    "title": "Acceleration Time (s)",
-                    "x-name": "acceleration_time_(s)",
+                "amps_divisor": {
+                    "title": "Amps Divisor",
+                    "x-name": "amps_divisor",
+                    "x-hidden": true,
+                    "type": [
+                        "integer",
+                        "null"
+                    ],
+                    "x-required": false,
+                    "description": "Divisor for motor current register value",
+                    "default": 10,
+                    "x-position": 6
+                },
+                "max_amps": {
+                    "title": "Max Amps",
+                    "x-name": "max_amps",
                     "x-hidden": false,
-                    "type": "number",
-                    "description": "Time to accelerate from 0 to max frequency",
-                    "default": 10.0
+                    "type": [
+                        "number",
+                        "null"
+                    ],
+                    "x-required": false,
+                    "description": "Nominal motor current for overcurrent warnings",
+                    "default": 50.0,
+                    "x-position": 7
                 },
-                "deceleration_time_(s)": {
-                    "title": "Deceleration Time (s)",
-                    "x-name": "deceleration_time_(s)",
+                "terminal_mode_label": {
+                    "title": "Terminal Mode Label",
+                    "x-name": "terminal_mode_label",
                     "x-hidden": false,
-                    "type": "number",
-                    "description": "Time to decelerate from max frequency to 0",
-                    "default": 10.0
+                    "type": [
+                        "string",
+                        "null"
+                    ],
+                    "x-required": false,
+                    "description": "If set, a mode selector appears in the UI allowing the operator to switch between terminal control (e.g. a float switch wired to the drive) and remote user control. The label you enter here is shown as the name of the terminal mode (e.g. 'Float Switch'). Leave blank if the drive is always controlled remotely.",
+                    "default": "",
+                    "x-position": 8
                 },
-                "enable_remote_control": {
-                    "title": "Enable Remote Control",
-                    "x-name": "enable_remote_control",
+                "di_1_name": {
+                    "title": "DI 1 Name",
+                    "x-name": "di_1_name",
                     "x-hidden": false,
-                    "type": "boolean",
-                    "description": "Allow remote start/stop commands",
-                    "default": false
+                    "type": [
+                        "string",
+                        "null"
+                    ],
+                    "x-required": false,
+                    "default": "Digital Input 1",
+                    "x-position": 9
                 },
-                "enable_speed_control": {
-                    "title": "Enable Speed Control",
-                    "x-name": "enable_speed_control",
+                "di_2_name": {
+                    "title": "DI 2 Name",
+                    "x-name": "di_2_name",
                     "x-hidden": false,
-                    "type": "boolean",
-                    "description": "Allow remote frequency/speed changes",
-                    "default": false
+                    "type": [
+                        "string",
+                        "null"
+                    ],
+                    "x-required": false,
+                    "default": "Digital Input 2",
+                    "x-position": 10
                 },
-                "poll_interval_(s)": {
-                    "title": "Poll Interval (s)",
-                    "x-name": "poll_interval_(s)",
+                "di_3_name": {
+                    "title": "DI 3 Name",
+                    "x-name": "di_3_name",
                     "x-hidden": false,
-                    "type": "number",
-                    "description": "Interval between status polls",
-                    "default": 1.0
+                    "type": [
+                        "string",
+                        "null"
+                    ],
+                    "x-required": false,
+                    "default": "Digital Input 3",
+                    "x-position": 11
                 },
-                "overcurrent_threshold_(%)": {
+                "overcurrent_threshold_": {
                     "title": "Overcurrent Threshold (%)",
-                    "x-name": "overcurrent_threshold_(%)",
-                    "x-hidden": false,
-                    "type": "number",
-                    "description": "Current threshold for overcurrent warning (% of nominal)",
-                    "default": 110.0
+                    "x-name": "overcurrent_threshold_",
+                    "x-hidden": true,
+                    "type": [
+                        "number",
+                        "null"
+                    ],
+                    "x-required": false,
+                    "description": "Percentage of max amps that triggers overcurrent warning",
+                    "default": 110.0,
+                    "x-position": 12
                 },
-                "overtemperature_threshold_(c)": {
+                "overtemperature_threshold_c": {
                     "title": "Overtemperature Threshold (C)",
-                    "x-name": "overtemperature_threshold_(c)",
-                    "x-hidden": false,
-                    "type": "number",
-                    "description": "Temperature threshold for overtemperature warning",
-                    "default": 80.0
+                    "x-name": "overtemperature_threshold_c",
+                    "x-hidden": true,
+                    "type": [
+                        "number",
+                        "null"
+                    ],
+                    "x-required": false,
+                    "description": "Drive temperature alarm threshold in degrees C",
+                    "default": 80.0,
+                    "x-position": 13
+                },
+                "dv-app-position": {
+                    "title": "Position",
+                    "x-name": "dv-app-position",
+                    "x-hidden": true,
+                    "type": [
+                        "integer",
+                        "null"
+                    ],
+                    "x-required": false,
+                    "description": "Position of Application in UI Structure. Smaller numbers are closer to the top.",
+                    "default": 100,
+                    "x-position": 14,
+                    "minimum": 0
                 }
             },
             "additionalElements": true,
             "required": []
-        },
-        "id": "145351896956176644",
-        "banner_url": null
+        }
     }
 }

@@ -1,0 +1,11 @@
+[project]
+name = "atv600-simulator"
+version = "0.1.0"
+description = "Modbus TCP simulator for Schneider Altivar ATV600 VSD"
+requires-python = ">=3.11"
+dependencies = [
+    "pymodbus>=3.11.4",
+]
+
+[project.scripts]
+atv600-sim = "main:main"
