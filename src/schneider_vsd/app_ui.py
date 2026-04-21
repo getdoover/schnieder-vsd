@@ -5,19 +5,34 @@ from pydoover import ui
 from .app_tags import SchneiderVsdTags
 
 
-class SchneiderVsdUI(ui.UI):
+# Tag-backed resolvers for attributes that change at runtime. The UI schema
+# is published once at setup, so we can't mutate element.hidden / display_name
+# from main_loop — the mutations wouldn't propagate. Instead we bind those
+# fields to tags and update the tags each cycle; the platform re-resolves on
+# each render.
+_HIDE_START = "$tag.app().hide_start_button:boolean:true"
+_HIDE_STOP = "$tag.app().hide_stop_button:boolean:true"
+_HIDE_RESET = "$tag.app().hide_reset_fault_button:boolean:true"
+_HIDE_FREQ = "$tag.app().hide_frequency_setpoint:boolean:true"
+_HIDE_NO_COMMS = "$tag.app().hide_no_comms_warning:boolean:true"
+_HIDE_MOTOR_FAULT = "$tag.app().hide_motor_fault_warning:boolean:true"
+_MOTOR_FAULT_LABEL = '$tag.app().motor_fault_label:string:"Motor Fault"'
+_APP_DISPLAY_NAME = '$tag.app().app_display_name:string:"Schneider VSD"'
 
-    # --- Warnings (hidden by default; toggled from application.py) ---
+
+class SchneiderVsdUI(ui.UI, display_name=_APP_DISPLAY_NAME):
+
+    # --- Warnings (top of page; visibility driven by tags) ---
     no_comms_warning = ui.WarningIndicator(
         "No communications with VSD",
         name="no_comms_warning",
-        hidden=True,
+        hidden=_HIDE_NO_COMMS,
         can_cancel=False,
     )
     motor_fault_warning = ui.WarningIndicator(
-        "Motor Fault",
+        _MOTOR_FAULT_LABEL,
         name="motor_fault_warning",
-        hidden=True,
+        hidden=_HIDE_MOTOR_FAULT,
         can_cancel=False,
     )
 
@@ -58,26 +73,30 @@ class SchneiderVsdUI(ui.UI):
         units="hrs", precision=1,
     )
 
-    # --- Digital inputs (top-level, hidden unless labelled in config) ---
+    # --- Digital inputs (top-level; config-driven hide in setup()) ---
     di_1 = ui.BooleanVariable("Digital Input 1", value=SchneiderVsdTags.di_1)
     di_2 = ui.BooleanVariable("Digital Input 2", value=SchneiderVsdTags.di_2)
     di_3 = ui.BooleanVariable("Digital Input 3", value=SchneiderVsdTags.di_3)
 
-    # --- Control (top-level, visibility managed from application.py) ---
+    # --- Control (top-level; runtime hide bound to tags) ---
     frequency_setpoint = ui.FloatInput(
         "Frequency Setpoint", units="Hz", precision=1,
+        hidden=_HIDE_FREQ,
         help_str="Set the target output frequency for the motor.",
     )
     start_button = ui.Button(
         "Start", name="start_button", requires_confirm=True,
+        hidden=_HIDE_START,
         help_str="Send a start command to the drive.",
     )
     stop_button = ui.Button(
         "Stop", name="stop_button", requires_confirm=True,
+        hidden=_HIDE_STOP,
         help_str="Send a stop command to the drive.",
     )
     reset_fault_button = ui.Button(
         "Reset Fault", name="reset_fault_button", requires_confirm=True,
+        hidden=_HIDE_RESET,
         help_str=(
             "Clear an active fault on the drive. "
             "The drive must be in a faulted state for this to take effect."

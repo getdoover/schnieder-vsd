@@ -140,7 +140,7 @@ class SchneiderVsdApplication(Application):
         await self.tags.app_display_name.set(
             f"{self.app_display_name} : {self._state_label(status)}"
         )
-        self._update_ui_visibility(status)
+        await self._update_ui_visibility(status)
 
     async def _set_disconnected(self):
         await self.tags.comms_active.set(False)
@@ -148,7 +148,7 @@ class SchneiderVsdApplication(Application):
         await self.tags.app_display_name.set(
             f"{self.app_display_name} : {self._state_label(None)}"
         )
-        self._update_ui_visibility(None)
+        await self._update_ui_visibility(None)
 
     @staticmethod
     def _state_label(status: VsdStatus | None) -> str:
@@ -156,30 +156,35 @@ class SchneiderVsdApplication(Application):
             return "No Comms"
         return status.hmis_name.replace("_", " ").title()
 
-    def _update_ui_visibility(self, status: VsdStatus | None) -> None:
-        """Toggle control visibility each cycle based on drive state."""
+    async def _update_ui_visibility(self, status: VsdStatus | None) -> None:
+        """Drive conditional UI visibility via tag-backed resolvers.
+
+        Element.hidden is bound to $tag.app().hide_<name> in app_ui.py — the
+        schema is only published once at setup, so we can't mutate element
+        attributes at runtime. Tag writes re-render each cycle.
+        """
         contactable = status is not None and status.contactable
         in_terminals = self._is_terminal_mode()
         is_running = contactable and status.is_running
         is_faulted = contactable and status.is_faulted
 
-        self.ui.frequency_setpoint.hidden = in_terminals or not contactable
-        self.ui.start_button.hidden = (
+        await self.tags.hide_frequency_setpoint.set(
+            in_terminals or not contactable
+        )
+        await self.tags.hide_start_button.set(
             in_terminals or is_running or not contactable
         )
-        self.ui.stop_button.hidden = (
-            in_terminals or not is_running
+        await self.tags.hide_stop_button.set(
+            in_terminals or not is_running or not contactable
         )
-        self.ui.reset_fault_button.hidden = not is_faulted
+        await self.tags.hide_reset_fault_button.set(not is_faulted)
 
-        # Warning indicators
-        self.ui.no_comms_warning.hidden = contactable
-        self.ui.motor_fault_warning.hidden = not is_faulted
+        await self.tags.hide_no_comms_warning.set(contactable)
+        await self.tags.hide_motor_fault_warning.set(not is_faulted)
         if is_faulted:
             fault_desc = (status.fault_description or "").strip()
-            self.ui.motor_fault_warning.display_name = (
-                f"Motor Fault: {fault_desc}" if fault_desc else "Motor Fault"
-            )
+            label = f"Motor Fault: {fault_desc}" if fault_desc else "Motor Fault"
+            await self.tags.motor_fault_label.set(label)
 
     # ------------------------------------------------------------------
     # Warnings

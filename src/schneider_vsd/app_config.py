@@ -26,8 +26,14 @@ class SchneiderVsdConfig(config.Schema):
     modbus_unit_id = config.Integer(
         "Modbus Unit ID",
         default=1,
-        minimum=1,
+        minimum=0,
         maximum=247,
+        description=(
+            "Modbus slave/unit ID. ATV6xx embedded Ethernet typically uses "
+            "the value set in ADDT on the drive HMI (often 248 by default, "
+            "sometimes left at 1). Try 0 if writes fail with ILLEGAL FUNCTION "
+            "— some drives accept 0 as a catch-all on Ethernet."
+        ),
     )
 
     # Operating limits

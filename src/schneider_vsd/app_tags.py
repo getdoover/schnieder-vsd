@@ -29,3 +29,13 @@ class SchneiderVsdTags(Tags):
     di_1 = Tag("boolean", default=None)
     di_2 = Tag("boolean", default=None)
     di_3 = Tag("boolean", default=None)
+
+    # Dynamic UI state (bound into UI element hidden/display_name resolvers).
+    # Default True means element starts hidden until main_loop decides otherwise.
+    hide_start_button = Tag("boolean", default=True)
+    hide_stop_button = Tag("boolean", default=True)
+    hide_reset_fault_button = Tag("boolean", default=True)
+    hide_frequency_setpoint = Tag("boolean", default=True)
+    hide_no_comms_warning = Tag("boolean", default=True)
+    hide_motor_fault_warning = Tag("boolean", default=True)
+    motor_fault_label = Tag("string", default="Motor Fault")
