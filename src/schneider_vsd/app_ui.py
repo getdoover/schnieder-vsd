@@ -58,29 +58,29 @@ class SchneiderVsdUI(ui.UI, display_name=_APP_DISPLAY_NAME):
     # --- Operating values (top-level) ---
     output_frequency = ui.NumericVariable(
         "Speed", value=SchneiderVsdTags.vsd_frequency,
-        units="Hz", precision=1, form=ui.Widget.radial,
+        units="Hz", precision=1, form=ui.Widget.radial, icon="gauge",
     )
     motor_power = ui.NumericVariable(
         "Motor Power", value=SchneiderVsdTags.vsd_power,
-        units="kW", precision=1, form=ui.Widget.radial,
+        units="kW", precision=1, icon="bolt",
     )
     drive_thermal_load = ui.NumericVariable(
         "Drive Thermal Load", value=SchneiderVsdTags.vsd_thermal_load,
-        units="%", precision=0, form=ui.Widget.radial,
+        units="%", precision=0, icon="thermometer-half",
     )
     mains_voltage = ui.NumericVariable(
         "Mains Voltage", value=SchneiderVsdTags.vsd_mains_voltage,
-        units="V", precision=0, form=ui.Widget.radial,
+        units="V", precision=0, icon="plug",
     )
     motor_run_hours = ui.NumericVariable(
         "Total Hours", value=SchneiderVsdTags.motor_run_hours,
-        units="hrs", precision=1,
+        units="hrs", precision=1, icon="clock",
     )
 
     # --- Digital inputs (top-level; config-driven hide in setup()) ---
-    di_1 = ui.BooleanVariable("Digital Input 1", value=SchneiderVsdTags.di_1)
-    di_2 = ui.BooleanVariable("Digital Input 2", value=SchneiderVsdTags.di_2)
-    di_3 = ui.BooleanVariable("Digital Input 3", value=SchneiderVsdTags.di_3)
+    di_1 = ui.BooleanVariable("Digital Input 1", value=SchneiderVsdTags.di_1, icon="toggle-on")
+    di_2 = ui.BooleanVariable("Digital Input 2", value=SchneiderVsdTags.di_2, icon="toggle-on")
+    di_3 = ui.BooleanVariable("Digital Input 3", value=SchneiderVsdTags.di_3, icon="toggle-on")
 
     # --- Control (top-level; runtime hide bound to tags) ---
     frequency_setpoint = ui.FloatInput(
