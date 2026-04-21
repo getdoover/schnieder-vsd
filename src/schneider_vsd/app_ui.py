@@ -58,19 +58,19 @@ class SchneiderVsdUI(ui.UI, display_name=_APP_DISPLAY_NAME):
     # --- Operating values (top-level) ---
     output_frequency = ui.NumericVariable(
         "Speed", value=SchneiderVsdTags.vsd_frequency,
-        units="Hz", precision=1,
+        units="Hz", precision=1, form=ui.Widget.radial,
     )
     motor_power = ui.NumericVariable(
         "Motor Power", value=SchneiderVsdTags.vsd_power,
-        units="kW", precision=1,
+        units="kW", precision=1, form=ui.Widget.radial,
     )
     drive_thermal_load = ui.NumericVariable(
         "Drive Thermal Load", value=SchneiderVsdTags.vsd_thermal_load,
-        units="%", precision=0,
+        units="%", precision=0, form=ui.Widget.radial,
     )
     mains_voltage = ui.NumericVariable(
         "Mains Voltage", value=SchneiderVsdTags.vsd_mains_voltage,
-        units="V", precision=0,
+        units="V", precision=0, form=ui.Widget.radial,
     )
     motor_run_hours = ui.NumericVariable(
         "Total Hours", value=SchneiderVsdTags.motor_run_hours,
