@@ -31,9 +31,10 @@ class VsdStatus:
     # Operating values
     frequency_hz: float = 0.0
     current_amps: float = 0.0
-    voltage_v: float = 0.0
-    power_kw: float = 0.0
-    temperature_c: float = 0.0
+    motor_voltage_v: float = 0.0   # UOP, motor output voltage (V)
+    mains_voltage_v: float = 0.0   # ULN, mains input voltage (V)
+    power_pct: float = 0.0         # OPR, motor power (% of nominal, signed)
+    temperature_c: float = 0.0     # TJP0, IGBT junction temperature (°C)
     motor_run_hours: float = 0.0
 
     # Fault info
@@ -45,8 +46,8 @@ class VsdStatus:
     di_2: bool = False
     di_3: bool = False
 
-    # Analog inputs
-    ai_1: float = 0.0
+    # Analog inputs (AI1C..AI5C physical scaled values)
+    ai_values: list[float] = field(default_factory=lambda: [0.0, 0.0, 0.0, 0.0, 0.0])
 
     # Raw registers for debugging
     raw_registers: dict[int, int] = field(default_factory=dict)

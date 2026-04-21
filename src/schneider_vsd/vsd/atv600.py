@@ -3,13 +3,16 @@
 Register map, command sequences, and status parsing ported from the
 proven vsd_control driver that has been running reliably across
 multiple ATV600 deployments.
+
+Register addresses/scaling cross-checked against
+`Edited - ATV600_Communication_parameters_EAV64332_V3.7.xlsx`.
 """
 
 import asyncio
 import logging
 import time
 
-from ..modbus_client import ModbusTcpConnection, reg_uint16, reg_uint32
+from ..modbus_client import ModbusTcpConnection, reg_int16, reg_uint16, reg_uint32
 from .base import VsdBase, VsdStatus
 
 log = logging.getLogger(__name__)
@@ -20,19 +23,19 @@ log = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 
 # Status block — batch read 3200..3274 (75 regs, FC3)
-REG_FREQUENCY = 3202        # Output frequency, raw / 10 = Hz
-REG_CURRENT = 3204          # Motor current, raw / amps_divisor = A
-REG_VOLTAGE = 3207          # Motor voltage (V)
-REG_POWER = 3208            # Motor power, raw / 10 = kW
-REG_TEMPERATURE = 3210      # Drive temperature (deg C)
-REG_STATUS = 3240           # HMIS status word
-REG_MOTOR_TIME = 3244       # Motor run time, uint32 seconds
+REG_FREQUENCY = 3202        # RFR — output frequency, 0.1 Hz
+REG_CURRENT = 3204          # LCR — motor current, raw / amps_divisor = A
+REG_MAINS_VOLTAGE = 3207    # ULN — mains voltage, 0.1 V
+REG_MOTOR_VOLTAGE = 3208    # UOP — motor voltage, 1 V
+REG_POWER_PCT = 3211        # OPR — motor power, 1 % (signed, % of nominal)
+REG_STATUS = 3240           # HMIS — device state enumeration
+REG_MOTOR_TIME = 3244       # RTH — motor run time, uint32 seconds
 
 # I/O block — batch read 5200..5249 (50 regs, FC3)
-REG_DIGITAL_IN = 5202       # DI status (DI1=bit0, DI2=bit1, DI3=bit2)
-REG_ANALOG_IN_1 = 5232      # Analog input 1
+REG_DIGITAL_IN = 5202       # IL1R — logic inputs (bit0=DI1, bit1=DI2, ...)
+REG_AI1_PHYSICAL = 5242     # AI1C..AI5C — physical (scaled) values at 5242..5246
 
-# Config block — batch read 8400..8524 (125 regs, FC3)
+# Config block — batch read 8400..8524 (125 regs, FC3) [unused, retained for parity]
 REG_CHCF = 8401             # I/O control mode
 REG_RCB = 8412              # Reference frequency switching (can't change while running)
 REG_RF1 = 8413              # Reference frequency 1 source
@@ -49,9 +52,11 @@ REG_SPEED_SET = 8502        # Speed setpoint, Hz * 10
 REG_RSF = 7124              # Fault reset assignment
 REG_BMP = 13529             # BMP — disable local-only mode lockout
 
-# Diagnostic — last fault code (LFT per Schneider ATV6xx Modbus parameter guide).
-# Not verified against the vsd_control source; confirm on hardware.
-REG_LFT = 7121
+# Diagnostic — single-register reads outside the batched blocks
+REG_LFT = 7121              # LFT — last error occurred (only read when faulted)
+REG_IGBT_TEMP = 7350        # TJP0 — IGBT junction temperature, 1 °C
+
+NUM_ANALOG_INPUTS = 5       # AI1..AI5
 
 
 # ---------------------------------------------------------------------------
@@ -187,8 +192,9 @@ class ATV600(VsdBase):
           2. I/O block     5200-5249  (50 regs)
           3. Config block  8400-8524  (125 regs)
 
-        If the drive is signalling fault (HMIS == 23) an additional single
-        read of LFT (7121) is issued to resolve the fault code.
+        Plus an unconditional single-register read for TJP0 (IGBT junction
+        temperature, 7350) and, when HMIS indicates fault, a single read of
+        LFT (7121) to resolve the fault code.
 
         All via FC3 (read holding registers).
         """
@@ -204,6 +210,9 @@ class ATV600(VsdBase):
                 # Retained from vsd_control for behavioural parity; result is
                 # unused today. Do not remove without verifying on hardware.
                 await conn.read_holding_registers(8400, 125)
+
+                # IGBT junction temperature — TJP0 lives outside the batches
+                igbt_reg = await conn.read_holding_registers(REG_IGBT_TEMP, 1)
 
                 # Only pay for the LFT read when the drive is signalling a fault.
                 fault_reg = None
@@ -225,9 +234,9 @@ class ATV600(VsdBase):
 
             status.frequency_hz = reg_uint16(status_regs, REG_FREQUENCY - 3200) / 10.0
             status.current_amps = reg_uint16(status_regs, REG_CURRENT - 3200) / self.amps_divisor
-            status.voltage_v = reg_uint16(status_regs, REG_VOLTAGE - 3200)
-            status.power_kw = reg_uint16(status_regs, REG_POWER - 3200) / 10.0
-            status.temperature_c = reg_uint16(status_regs, REG_TEMPERATURE - 3200)
+            status.mains_voltage_v = reg_uint16(status_regs, REG_MAINS_VOLTAGE - 3200) / 10.0
+            status.motor_voltage_v = reg_uint16(status_regs, REG_MOTOR_VOLTAGE - 3200)
+            status.power_pct = reg_int16(status_regs, REG_POWER_PCT - 3200)
             status.motor_run_hours = round(
                 reg_uint32(status_regs, REG_MOTOR_TIME - 3200) / 3600.0, 2
             )
@@ -238,7 +247,16 @@ class ATV600(VsdBase):
                 status.di_1 = bool(di & 0x01)
                 status.di_2 = bool(di & 0x02)
                 status.di_3 = bool(di & 0x04)
-                status.ai_1 = reg_uint16(io_regs, REG_ANALOG_IN_1 - 5200)
+                # AI1C..AI5C — physical values (scaled per drive config)
+                status.ai_values = [
+                    reg_int16(io_regs, (REG_AI1_PHYSICAL - 5200) + i)
+                    for i in range(NUM_ANALOG_INPUTS)
+                ]
+
+            # --- Temperature (IGBT junction) ---
+            if igbt_reg:
+                # TJP0 is signed int16 in °C
+                status.temperature_c = reg_int16(igbt_reg, 0)
 
             # --- Fault code ---
             if fault_reg:

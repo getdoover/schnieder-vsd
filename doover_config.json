@@ -83,7 +83,7 @@
                     ],
                     "x-required": false,
                     "description": "Modbus slave/unit ID. ATV6xx embedded Ethernet typically uses the value set in ADDT on the drive HMI (often 248 by default, sometimes left at 1). Try 0 if writes fail with ILLEGAL FUNCTION \u2014 some drives accept 0 as a catch-all on Ethernet.",
-                    "default": 1,
+                    "default": 0,
                     "x-position": 3,
                     "minimum": 0,
                     "maximum": 247

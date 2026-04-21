@@ -129,13 +129,23 @@ class SchneiderVsdApplication(Application):
         )
         await self.tags.vsd_frequency.set(status.frequency_hz)
         await self.tags.vsd_current.set(status.current_amps)
-        await self.tags.vsd_voltage.set(status.voltage_v)
-        await self.tags.vsd_power.set(status.power_kw)
+        await self.tags.vsd_voltage.set(status.motor_voltage_v)
+        await self.tags.vsd_mains_voltage.set(status.mains_voltage_v)
+        # OPR is signed % of motor nominal; translate to kW via configured rating.
+        power_kw = status.power_pct / 100.0 * self.config.max_power_kw.value
+        await self.tags.vsd_power.set(round(power_kw, 2))
+        await self.tags.vsd_power_pct.set(status.power_pct)
         await self.tags.vsd_temperature.set(status.temperature_c)
         await self.tags.motor_run_hours.set(round(status.motor_run_hours, 1))
         await self.tags.di_1.set(status.di_1)
         await self.tags.di_2.set(status.di_2)
         await self.tags.di_3.set(status.di_3)
+        ai_1, ai_2, ai_3, ai_4, ai_5 = status.ai_values
+        await self.tags.ai_1.set(ai_1)
+        await self.tags.ai_2.set(ai_2)
+        await self.tags.ai_3.set(ai_3)
+        await self.tags.ai_4.set(ai_4)
+        await self.tags.ai_5.set(ai_5)
 
         await self.tags.app_display_name.set(
             f"{self.app_display_name} : {self._state_label(status)}"
@@ -194,22 +204,23 @@ class SchneiderVsdApplication(Application):
         max_kw = self.config.max_power_kw.value
         op_threshold = max_kw * (self.config.overpower_threshold.value / 100.0)
         ot_threshold = self.config.overtemperature_threshold.value
+        power_kw = status.power_pct / 100.0 * max_kw
 
-        if status.power_kw > op_threshold:
+        if power_kw > op_threshold:
             if not self._warned_overpower:
                 self._warned_overpower = True
                 log.warning(
                     "Motor overload: %.1f kW > %.1f kW threshold",
-                    status.power_kw, op_threshold,
+                    power_kw, op_threshold,
                 )
                 await self.create_message("notifications", {
                     "title": "VSD high motor load",
                     "message": (
-                        f"VSD high motor load: {status.power_kw:.1f}kW "
+                        f"VSD high motor load: {power_kw:.1f}kW "
                         f"> {op_threshold:.1f}kW"
                     ),
                     "body": (
-                        f"Motor power {status.power_kw:.1f}kW exceeds "
+                        f"Motor power {power_kw:.1f}kW exceeds "
                         f"threshold {op_threshold:.1f}kW"
                     ),
                     "severity": "warning",

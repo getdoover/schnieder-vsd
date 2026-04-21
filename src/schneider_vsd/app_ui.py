@@ -64,6 +64,10 @@ class SchneiderVsdUI(ui.UI, display_name=_APP_DISPLAY_NAME):
         "Motor Power", value=SchneiderVsdTags.vsd_power,
         units="kW", precision=1,
     )
+    motor_voltage = ui.NumericVariable(
+        "Motor Voltage", value=SchneiderVsdTags.vsd_voltage,
+        units="V", precision=0,
+    )
     drive_temperature = ui.NumericVariable(
         "Drive Temperature", value=SchneiderVsdTags.vsd_temperature,
         units="°C", precision=0,

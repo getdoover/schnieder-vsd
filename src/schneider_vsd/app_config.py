@@ -25,7 +25,7 @@ class SchneiderVsdConfig(config.Schema):
     )
     modbus_unit_id = config.Integer(
         "Modbus Unit ID",
-        default=1,
+        default=0,
         minimum=0,
         maximum=247,
         description=(
