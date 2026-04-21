@@ -137,21 +137,40 @@ class SchneiderVsdApplication(Application):
         await self.tags.di_2.set(status.di_2)
         await self.tags.di_3.set(status.di_3)
 
-        # Dynamic display name
-        if status.is_running:
-            name = f"{self.app_display_name} - {status.frequency_hz:.1f}Hz"
-        elif status.is_faulted:
-            name = f"{self.app_display_name} - FAULT"
-        else:
-            name = self.app_display_name
-        await self.tags.app_display_name.set(name)
+        await self.tags.app_display_name.set(
+            f"{self.app_display_name} : {self._state_label(status)}"
+        )
+        self._update_ui_visibility(status)
 
     async def _set_disconnected(self):
         await self.tags.comms_active.set(False)
         await self.tags.vsd_state.set("disconnected")
         await self.tags.app_display_name.set(
-            f"{self.app_display_name} - OFFLINE",
+            f"{self.app_display_name} : {self._state_label(None)}"
         )
+        self._update_ui_visibility(None)
+
+    @staticmethod
+    def _state_label(status: VsdStatus | None) -> str:
+        if status is None or not status.contactable:
+            return "No Comms"
+        return status.hmis_name.replace("_", " ").title()
+
+    def _update_ui_visibility(self, status: VsdStatus | None) -> None:
+        """Toggle control visibility each cycle based on drive state."""
+        contactable = status is not None and status.contactable
+        in_terminals = self._is_terminal_mode()
+        is_running = contactable and status.is_running
+        is_faulted = contactable and status.is_faulted
+
+        self.ui.frequency_setpoint.hidden = in_terminals or not contactable
+        self.ui.start_button.hidden = (
+            in_terminals or is_running or not contactable
+        )
+        self.ui.stop_button.hidden = (
+            in_terminals or not is_running
+        )
+        self.ui.reset_fault_button.hidden = not is_faulted
 
     # ------------------------------------------------------------------
     # Warnings

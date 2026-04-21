@@ -18,68 +18,38 @@ class SchneiderVsdUI(ui.UI):
         default="user_control",
         help_str=(
             "Controls how the drive receives start/stop commands.\n\n"
-            "User Control \u2014 start, stop, and set speed from this interface. "
+            "User Control — start, stop, and set speed from this interface. "
             "The drive accepts commands over its network connection.\n\n"
-            "Terminal Control \u2014 the drive is controlled by a physical signal "
+            "Terminal Control — the drive is controlled by a physical signal "
             "wired to its terminal inputs (e.g. a float switch or relay). "
             "Remote controls are disabled while in this mode."
         ),
     )
 
-    # --- Drive status ---
-    drive_state = ui.TextVariable("Drive State", value=SchneiderVsdTags.vsd_state)
-    is_running = ui.BooleanVariable("Running", value=SchneiderVsdTags.vsd_running)
-    is_faulted = ui.BooleanVariable("Faulted", value=SchneiderVsdTags.vsd_faulted)
-    fault_description = ui.TextVariable(
-        "Fault", value=SchneiderVsdTags.vsd_fault_description,
-    )
-
-    # --- Operating values ---
+    # --- Operating values (top-level) ---
     output_frequency = ui.NumericVariable(
-        "Output Frequency", value=SchneiderVsdTags.vsd_frequency,
+        "Speed", value=SchneiderVsdTags.vsd_frequency,
         units="Hz", precision=1,
     )
     motor_current = ui.NumericVariable(
-        "Motor Current", value=SchneiderVsdTags.vsd_current,
+        "Current Draw", value=SchneiderVsdTags.vsd_current,
         units="A", precision=1,
-    )
-    motor_voltage = ui.NumericVariable(
-        "Motor Voltage", value=SchneiderVsdTags.vsd_voltage,
-        units="V", precision=0,
-    )
-    motor_power = ui.NumericVariable(
-        "Motor Power", value=SchneiderVsdTags.vsd_power,
-        units="kW", precision=1,
     )
     drive_temperature = ui.NumericVariable(
         "Drive Temperature", value=SchneiderVsdTags.vsd_temperature,
-        units="\u00b0C", precision=0,
+        units="°C", precision=0,
     )
     motor_run_hours = ui.NumericVariable(
-        "Motor Run Hours", value=SchneiderVsdTags.motor_run_hours,
+        "Total Hours", value=SchneiderVsdTags.motor_run_hours,
         units="hrs", precision=1,
     )
 
-    operating_values = ui.Submodule(
-        "Operating Values",
-        children=[
-            output_frequency, motor_current, motor_voltage,
-            motor_power, drive_temperature, motor_run_hours,
-        ],
-    )
-
-    # --- Digital inputs ---
+    # --- Digital inputs (top-level, hidden unless labelled in config) ---
     di_1 = ui.BooleanVariable("Digital Input 1", value=SchneiderVsdTags.di_1)
     di_2 = ui.BooleanVariable("Digital Input 2", value=SchneiderVsdTags.di_2)
     di_3 = ui.BooleanVariable("Digital Input 3", value=SchneiderVsdTags.di_3)
 
-    digital_inputs = ui.Submodule(
-        "Digital Inputs",
-        children=[di_1, di_2, di_3],
-        is_collapsed=True,
-    )
-
-    # --- Control ---
+    # --- Control (top-level, visibility managed from application.py) ---
     frequency_setpoint = ui.FloatInput(
         "Frequency Setpoint", units="Hz", precision=1,
         help_str="Set the target output frequency for the motor.",
@@ -97,15 +67,6 @@ class SchneiderVsdUI(ui.UI):
         help_str=(
             "Clear an active fault on the drive. "
             "The drive must be in a faulted state for this to take effect."
-        ),
-    )
-
-    control = ui.Submodule(
-        "Control",
-        children=[frequency_setpoint, start_button, stop_button, reset_fault_button],
-        help_str=(
-            "Remote drive controls. These are only available when the "
-            "operating mode is set to User Control."
         ),
     )
 
@@ -127,10 +88,18 @@ class SchneiderVsdUI(ui.UI):
         self.frequency_setpoint.min_val = self.config.min_frequency.value
         self.frequency_setpoint.max_val = self.config.max_frequency.value
 
-        # Digital input labels
-        self.di_1.display_name = self.config.di_1_name.value
-        self.di_2.display_name = self.config.di_2_name.value
-        self.di_3.display_name = self.config.di_3_name.value
+        # Digital input labels — hide any DI whose config value is blank or
+        # still at the literal default "Digital Input N".
+        for idx, (di, cfg_value) in enumerate([
+            (self.di_1, self.config.di_1_name.value),
+            (self.di_2, self.config.di_2_name.value),
+            (self.di_3, self.config.di_3_name.value),
+        ], start=1):
+            default_label = f"Digital Input {idx}"
+            if not cfg_value or cfg_value == default_label:
+                di.hidden = True
+            else:
+                di.display_name = cfg_value
 
         # Colour ranges for frequency
         max_freq = self.config.max_frequency.value
