@@ -49,6 +49,10 @@ REG_SPEED_SET = 8502        # Speed setpoint, Hz * 10
 REG_RSF = 7124              # Fault reset assignment
 REG_BMP = 13529             # BMP — disable local-only mode lockout
 
+# Diagnostic — last fault code (LFT per Schneider ATV6xx Modbus parameter guide).
+# Not verified against the vsd_control source; confirm on hardware.
+REG_LFT = 7121
+
 
 # ---------------------------------------------------------------------------
 # HMIS status word values
@@ -145,7 +149,9 @@ class ATV600(VsdBase):
                     return False
 
             await asyncio.sleep(0.5)
-            await self._set_remote_ready_local()
+            if not await self._set_remote_ready_local():
+                log.error("Failed to apply remote-ready-local during setup")
+                return False
             await asyncio.sleep(0.5)
 
             # If faulted, try to clear
@@ -156,7 +162,9 @@ class ATV600(VsdBase):
                 await asyncio.sleep(0.2)
                 await self.clear_fault()
                 await asyncio.sleep(0.5)
-                await self._set_remote_ready_local()
+                if not await self._set_remote_ready_local():
+                    log.error("Failed to restore remote-ready-local after fault clear")
+                    return False
 
             self._contactable = True
             log.info("ATV600 setup complete (%s:%d)", self.host, self.port)
@@ -179,6 +187,9 @@ class ATV600(VsdBase):
           2. I/O block     5200-5249  (50 regs)
           3. Config block  8400-8524  (125 regs)
 
+        If the drive is signalling fault (HMIS == 23) an additional single
+        read of LFT (7121) is issued to resolve the fault code.
+
         All via FC3 (read holding registers).
         """
         status = VsdStatus()
@@ -190,8 +201,15 @@ class ATV600(VsdBase):
                     return status
 
                 io_regs = await conn.read_holding_registers(5200, 50)
-                # Config block read for monitoring — not parsed yet
+                # Retained from vsd_control for behavioural parity; result is
+                # unused today. Do not remove without verifying on hardware.
                 await conn.read_holding_registers(8400, 125)
+
+                # Only pay for the LFT read when the drive is signalling a fault.
+                fault_reg = None
+                hmis_peek = reg_uint16(status_regs, REG_STATUS - 3200)
+                if hmis_peek == 23:
+                    fault_reg = await conn.read_holding_registers(REG_LFT, 1)
 
             self._contactable = True
             status.contactable = True
@@ -222,6 +240,12 @@ class ATV600(VsdBase):
                 status.di_3 = bool(di & 0x04)
                 status.ai_1 = reg_uint16(io_regs, REG_ANALOG_IN_1 - 5200)
 
+            # --- Fault code ---
+            if fault_reg:
+                code = fault_reg[0]
+                status.fault_code = code
+                status.fault_description = FAULT_CODES.get(code, f"Fault code {code}")
+
             self._last_status = status
             return status
 
@@ -243,6 +267,9 @@ class ATV600(VsdBase):
         4. Write 7 (bits 0+1+2: remote mode + run)
         """
         try:
+            # Drain any pending commands before issuing the start sequence —
+            # retained from vsd_control. Blocks the main loop briefly; fine
+            # because the 5 s loop period gives ample headroom.
             await asyncio.sleep(2)
             await self._switch_to_remote()
             await asyncio.sleep(0.2)
@@ -306,14 +333,22 @@ class ATV600(VsdBase):
     async def clear_fault(self) -> bool:
         """Clear fault via rising-edge trigger on bit 7 of control word.
 
-        Pattern: unset bit 7 -> wait -> set bit 7 (rising edge).
+        Literal writes: 0 (all bits clear) then 128 (bit 7 set). Fault reset
+        is only ever called on a faulted drive, which is not running, so
+        clobbering bits 0-2 is safe.
+
+        Previously used read-modify-write:
+            write_register_bits(REG_CONTROL, bits_to_unset=[7])
+            write_register_bits(REG_CONTROL, bits_to_set=[7])
+        That variant could interleave with concurrent start/stop writes and
+        lose the run bit mid-reset. Literal writes remove the race.
         """
         try:
             async with self._conn() as conn:
-                if not await conn.write_register_bits(REG_CONTROL, bits_to_unset=[7]):
+                if not await conn.write_register(REG_CONTROL, 0):
                     return False
                 await asyncio.sleep(0.2)
-                if not await conn.write_register_bits(REG_CONTROL, bits_to_set=[7]):
+                if not await conn.write_register(REG_CONTROL, 128):
                     return False
 
             self._last_clear_fault_time = time.time()

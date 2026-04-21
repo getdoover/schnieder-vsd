@@ -7,9 +7,6 @@ class SchneiderVsdTags(Tags):
 
     app_display_name = Tag("string", default="Schneider VSD")
 
-    # Operating mode ("user_control" or "terminal_control")
-    operating_mode = Tag("string", default="user_control")
-
     # Connection
     comms_active = Tag("boolean", default=False)
 
@@ -32,8 +29,3 @@ class SchneiderVsdTags(Tags):
     di_1 = Tag("boolean", default=None)
     di_2 = Tag("boolean", default=None)
     di_3 = Tag("boolean", default=None)
-
-    # Cross-app alerting (e.g. pump shutdown on VSD fault)
-    alert_triggered = Tag("boolean", default=False)
-    alert_message_short = Tag("string", default=None)
-    alert_message_long = Tag("string", default=None)

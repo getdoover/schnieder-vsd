@@ -10,10 +10,12 @@ class SchneiderVsdUI(ui.UI):
     # --- Operating mode ---
     mode_selector = ui.Select(
         "Operating Mode",
+        name="mode_selector",
         options=[
             ui.Option("User Control"),
             ui.Option("Terminal Control"),
         ],
+        default="user_control",
         help_str=(
             "Controls how the drive receives start/stop commands.\n\n"
             "User Control \u2014 start, stop, and set speed from this interface. "
@@ -83,15 +85,15 @@ class SchneiderVsdUI(ui.UI):
         help_str="Set the target output frequency for the motor.",
     )
     start_button = ui.Button(
-        "Start", requires_confirm=True,
+        "Start", name="start_button", requires_confirm=True,
         help_str="Send a start command to the drive.",
     )
     stop_button = ui.Button(
-        "Stop", requires_confirm=True,
+        "Stop", name="stop_button", requires_confirm=True,
         help_str="Send a stop command to the drive.",
     )
     reset_fault_button = ui.Button(
-        "Reset Fault", requires_confirm=True,
+        "Reset Fault", name="reset_fault_button", requires_confirm=True,
         help_str=(
             "Clear an active fault on the drive. "
             "The drive must be in a faulted state for this to take effect."
@@ -117,6 +119,9 @@ class SchneiderVsdUI(ui.UI):
         else:
             # Rename the "Terminal Control" option to the configured label
             self.mode_selector.options[1].display_name = terminal_label
+            # Fresh installs with a physical terminal wired up should default
+            # to terminal control so Modbus commands don't fight the wiring.
+            self.mode_selector.default = "terminal_control"
 
         # Frequency input range
         self.frequency_setpoint.min_val = self.config.min_frequency.value

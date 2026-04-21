@@ -38,17 +38,15 @@ class SchneiderVsdApplication(Application):
         self._warned_overcurrent = False
         self._warned_overtemperature = False
 
-        # If terminal mode is configured, default to terminal on first boot
-        if self.config.terminal_mode_label.value:
-            if self.tags.operating_mode.value is None:
-                await self.tags.operating_mode.set("terminal_control")
+    def _selected_mode(self) -> str:
+        return self.ui_manager.get_value("mode_selector")
 
     @property
     def _is_terminal_mode(self) -> bool:
         """True when a terminal mode is configured AND currently selected."""
         return (
             bool(self.config.terminal_mode_label.value)
-            and self.tags.operating_mode.value == "terminal_control"
+            and self._selected_mode() == "terminal_control"
         )
 
     @property
@@ -56,7 +54,7 @@ class SchneiderVsdApplication(Application):
         """True when the user can issue start/stop/speed commands."""
         # Terminal mode configured → must be in user_control
         if self.config.terminal_mode_label.value:
-            return self.tags.operating_mode.value == "user_control"
+            return self._selected_mode() == "user_control"
         # No terminal mode configured → always allowed
         return True
 
@@ -169,12 +167,18 @@ class SchneiderVsdApplication(Application):
                     "Overcurrent: %.1f A > %.1f A threshold",
                     status.current_amps, oc_threshold,
                 )
-                await self.tags.alert_triggered.set(True)
-                await self.tags.alert_message_short.set("VSD overcurrent")
-                await self.tags.alert_message_long.set(
-                    f"Motor current {status.current_amps:.1f}A exceeds "
-                    f"threshold {oc_threshold:.1f}A"
-                )
+                await self.create_message("notifications", {
+                    "title": "VSD overcurrent",
+                    "message": (
+                        f"VSD overcurrent: {status.current_amps:.1f}A "
+                        f"> {oc_threshold:.1f}A"
+                    ),
+                    "body": (
+                        f"Motor current {status.current_amps:.1f}A exceeds "
+                        f"threshold {oc_threshold:.1f}A"
+                    ),
+                    "severity": "warning",
+                })
         else:
             self._warned_overcurrent = False
 
@@ -185,12 +189,18 @@ class SchneiderVsdApplication(Application):
                     "Overtemperature: %d C > %d C threshold",
                     status.temperature_c, ot_threshold,
                 )
-                await self.tags.alert_triggered.set(True)
-                await self.tags.alert_message_short.set("VSD overtemperature")
-                await self.tags.alert_message_long.set(
-                    f"Drive temperature {status.temperature_c}\u00b0C exceeds "
-                    f"threshold {ot_threshold}\u00b0C"
-                )
+                await self.create_message("notifications", {
+                    "title": "VSD overtemperature",
+                    "message": (
+                        f"VSD overtemperature: {status.temperature_c}°C "
+                        f"> {ot_threshold}°C"
+                    ),
+                    "body": (
+                        f"Drive temperature {status.temperature_c}°C exceeds "
+                        f"threshold {ot_threshold}°C"
+                    ),
+                    "severity": "warning",
+                })
         else:
             self._warned_overtemperature = False
 
@@ -202,7 +212,6 @@ class SchneiderVsdApplication(Application):
     async def on_mode_change(self, ctx, value):
         if value is None:
             return
-        await self.tags.operating_mode.set(value)
         label = self.config.terminal_mode_label.value or "Terminal Control"
         if value == "terminal_control":
             log.info("Switching to terminal mode (%s)", label)
