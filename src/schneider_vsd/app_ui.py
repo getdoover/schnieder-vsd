@@ -64,13 +64,13 @@ class SchneiderVsdUI(ui.UI, display_name=_APP_DISPLAY_NAME):
         "Motor Power", value=SchneiderVsdTags.vsd_power,
         units="kW", precision=1,
     )
-    motor_voltage = ui.NumericVariable(
-        "Motor Voltage", value=SchneiderVsdTags.vsd_voltage,
-        units="V", precision=0,
-    )
-    drive_load = ui.NumericVariable(
-        "Drive Load", value=SchneiderVsdTags.vsd_thermal_load,
+    drive_thermal_load = ui.NumericVariable(
+        "Drive Thermal Load", value=SchneiderVsdTags.vsd_thermal_load,
         units="%", precision=0,
+    )
+    mains_voltage = ui.NumericVariable(
+        "Mains Voltage", value=SchneiderVsdTags.vsd_mains_voltage,
+        units="V", precision=0,
     )
     motor_run_hours = ui.NumericVariable(
         "Total Hours", value=SchneiderVsdTags.motor_run_hours,
@@ -147,7 +147,7 @@ class SchneiderVsdUI(ui.UI, display_name=_APP_DISPLAY_NAME):
 
         # Colour ranges for drive thermal load (%). THD trips at ~118%.
         temp_thresh = self.config.overtemperature_threshold.value
-        self.drive_load.ranges = [
+        self.drive_thermal_load.ranges = [
             ui.Range(None, 0, temp_thresh * 0.75, ui.Colour.green),
             ui.Range(None, temp_thresh * 0.75, temp_thresh, ui.Colour.yellow),
             ui.Range(None, temp_thresh, temp_thresh * 1.5, ui.Colour.red),
@@ -159,4 +159,12 @@ class SchneiderVsdUI(ui.UI, display_name=_APP_DISPLAY_NAME):
         self.motor_power.ranges = [
             ui.Range(None, 0, max_kw * op_pct, ui.Colour.green),
             ui.Range(None, max_kw * op_pct, max_kw * 1.5, ui.Colour.red),
+        ]
+
+        # Colour ranges for mains voltage — covers EU 400 V and AU/NZ 415 V
+        # systems with ±~10 % tolerance. Anything outside 360–440 V is abnormal.
+        self.mains_voltage.ranges = [
+            ui.Range(None, 0, 360, ui.Colour.red),
+            ui.Range(None, 360, 440, ui.Colour.green),
+            ui.Range(None, 440, 600, ui.Colour.red),
         ]
