@@ -38,10 +38,15 @@ class SchneiderVsdApplication(Application):
         self._warned_overcurrent = False
         self._warned_overtemperature = False
 
-    def _selected_mode(self) -> str:
-        return self.ui_manager.get_value("mode_selector")
+    def _selected_mode(self) -> str | None:
+        # Not a @property: pydoover's rpc.register_handlers uses
+        # inspect.getmembers, which evaluates @property getters before the
+        # UI manager has registered interactions — that raises KeyError.
+        try:
+            return self.ui_manager.get_value("mode_selector")
+        except KeyError:
+            return None
 
-    @property
     def _is_terminal_mode(self) -> bool:
         """True when a terminal mode is configured AND currently selected."""
         return (
@@ -49,13 +54,10 @@ class SchneiderVsdApplication(Application):
             and self._selected_mode() == "terminal_control"
         )
 
-    @property
     def _remote_control_allowed(self) -> bool:
         """True when the user can issue start/stop/speed commands."""
-        # Terminal mode configured → must be in user_control
         if self.config.terminal_mode_label.value:
             return self._selected_mode() == "user_control"
-        # No terminal mode configured → always allowed
         return True
 
     async def main_loop(self):
@@ -82,7 +84,7 @@ class SchneiderVsdApplication(Application):
         await self._enforce_operating_mode()
 
         # Periodic VSD management (auto fault recovery when not in terminal mode)
-        if not self._is_terminal_mode:
+        if not self._is_terminal_mode():
             await self.vsd.manage_operating_state()
 
         # Warning checks (always active regardless of mode)
@@ -105,7 +107,7 @@ class SchneiderVsdApplication(Application):
         if not self.vsd.is_contactable:
             return
 
-        if self._is_terminal_mode:
+        if self._is_terminal_mode():
             await self.vsd.set_operating_mode("terminal")
         else:
             await self.vsd.set_operating_mode("local")
@@ -221,7 +223,7 @@ class SchneiderVsdApplication(Application):
     @ui.handler("start_button")
     async def on_start(self, ctx, value):
         await ctx.set_value(None)
-        if not self._remote_control_allowed:
+        if not self._remote_control_allowed():
             log.warning("Start rejected — switch to User Control mode first")
             return
         if not self.vsd.is_contactable:
@@ -233,7 +235,7 @@ class SchneiderVsdApplication(Application):
     @ui.handler("stop_button")
     async def on_stop(self, ctx, value):
         await ctx.set_value(None)
-        if not self._remote_control_allowed:
+        if not self._remote_control_allowed():
             log.warning("Stop rejected — switch to User Control mode first")
             return
         if not self.vsd.is_contactable:
@@ -255,7 +257,7 @@ class SchneiderVsdApplication(Application):
     async def on_frequency_change(self, ctx, value):
         if value is None:
             return
-        if not self._remote_control_allowed:
+        if not self._remote_control_allowed():
             log.warning("Frequency change rejected — switch to User Control mode first")
             return
         if not self.vsd.is_contactable:
