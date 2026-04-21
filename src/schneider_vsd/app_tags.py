@@ -24,7 +24,7 @@ class SchneiderVsdTags(Tags):
     vsd_mains_voltage = Tag("number", default=None)   # mains input voltage (V)
     vsd_power = Tag("number", default=None)           # kW (computed from OPR% × rated)
     vsd_power_pct = Tag("number", default=None)       # raw OPR (% of motor nominal)
-    vsd_temperature = Tag("number", default=None)
+    vsd_thermal_load = Tag("number", default=None)   # % of drive thermal capacity
     motor_run_hours = Tag("number", default=None)
 
     # Digital inputs

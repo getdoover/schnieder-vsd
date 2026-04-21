@@ -34,7 +34,7 @@ class VsdStatus:
     motor_voltage_v: float = 0.0   # UOP, motor output voltage (V)
     mains_voltage_v: float = 0.0   # ULN, mains input voltage (V)
     power_pct: float = 0.0         # OPR, motor power (% of nominal, signed)
-    temperature_c: float = 0.0     # TJP0, IGBT junction temperature (°C)
+    thermal_load_pct: float = 0.0  # THD, drive thermal state (% — 100% = nominal)
     motor_run_hours: float = 0.0
 
     # Fault info

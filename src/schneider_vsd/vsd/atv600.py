@@ -27,6 +27,7 @@ REG_FREQUENCY = 3202        # RFR — output frequency, 0.1 Hz
 REG_CURRENT = 3204          # LCR — motor current, raw / amps_divisor = A
 REG_MAINS_VOLTAGE = 3207    # ULN — mains voltage, 0.1 V
 REG_MOTOR_VOLTAGE = 3208    # UOP — motor voltage, 1 V
+REG_THERMAL_LOAD = 3209     # THD — drive thermal state, 1 % (100% = nominal)
 REG_POWER_PCT = 3211        # OPR — motor power, 1 % (signed, % of nominal)
 REG_STATUS = 3240           # HMIS — device state enumeration
 REG_MOTOR_TIME = 3244       # RTH — motor run time, uint32 seconds
@@ -52,9 +53,8 @@ REG_SPEED_SET = 8502        # Speed setpoint, Hz * 10
 REG_RSF = 7124              # Fault reset assignment
 REG_BMP = 13529             # BMP — disable local-only mode lockout
 
-# Diagnostic — single-register reads outside the batched blocks
+# Diagnostic — single-register read outside the batched blocks
 REG_LFT = 7121              # LFT — last error occurred (only read when faulted)
-REG_IGBT_TEMP = 7350        # TJP0 — IGBT junction temperature, 1 °C
 
 NUM_ANALOG_INPUTS = 5       # AI1..AI5
 
@@ -192,9 +192,8 @@ class ATV600(VsdBase):
           2. I/O block     5200-5249  (50 regs)
           3. Config block  8400-8524  (125 regs)
 
-        Plus an unconditional single-register read for TJP0 (IGBT junction
-        temperature, 7350) and, when HMIS indicates fault, a single read of
-        LFT (7121) to resolve the fault code.
+        When HMIS indicates fault, an additional single read of LFT (7121)
+        is issued to resolve the fault code.
 
         All via FC3 (read holding registers).
         """
@@ -210,9 +209,6 @@ class ATV600(VsdBase):
                 # Retained from vsd_control for behavioural parity; result is
                 # unused today. Do not remove without verifying on hardware.
                 await conn.read_holding_registers(8400, 125)
-
-                # IGBT junction temperature — TJP0 lives outside the batches
-                igbt_reg = await conn.read_holding_registers(REG_IGBT_TEMP, 1)
 
                 # Only pay for the LFT read when the drive is signalling a fault.
                 fault_reg = None
@@ -236,6 +232,7 @@ class ATV600(VsdBase):
             status.current_amps = reg_uint16(status_regs, REG_CURRENT - 3200) / self.amps_divisor
             status.mains_voltage_v = reg_uint16(status_regs, REG_MAINS_VOLTAGE - 3200) / 10.0
             status.motor_voltage_v = reg_uint16(status_regs, REG_MOTOR_VOLTAGE - 3200)
+            status.thermal_load_pct = reg_uint16(status_regs, REG_THERMAL_LOAD - 3200)
             status.power_pct = reg_int16(status_regs, REG_POWER_PCT - 3200)
             status.motor_run_hours = round(
                 reg_uint32(status_regs, REG_MOTOR_TIME - 3200) / 3600.0, 2
@@ -252,11 +249,6 @@ class ATV600(VsdBase):
                     reg_int16(io_regs, (REG_AI1_PHYSICAL - 5200) + i)
                     for i in range(NUM_ANALOG_INPUTS)
                 ]
-
-            # --- Temperature (IGBT junction) ---
-            if igbt_reg:
-                # TJP0 is signed int16 in °C
-                status.temperature_c = reg_int16(igbt_reg, 0)
 
             # --- Fault code ---
             if fault_reg:
@@ -351,22 +343,29 @@ class ATV600(VsdBase):
     async def clear_fault(self) -> bool:
         """Clear fault via rising-edge trigger on bit 7 of control word.
 
-        Literal writes: 0 (all bits clear) then 128 (bit 7 set). Fault reset
-        is only ever called on a faulted drive, which is not running, so
-        clobbering bits 0-2 is safe.
+        Bits 1+2 must stay asserted across the pulse — they're the remote-mode
+        latch under this drive's I/O profile (CHCF=3). Dropping them puts the
+        drive out of remote config and the fault reset is ignored.
 
-        Previously used read-modify-write:
-            write_register_bits(REG_CONTROL, bits_to_unset=[7])
-            write_register_bits(REG_CONTROL, bits_to_set=[7])
-        That variant could interleave with concurrent start/stop writes and
-        lose the run bit mid-reset. Literal writes remove the race.
+        Sequence:
+            6   (0b0000_0110) — prep: bits 1+2 set, bit 7 clear
+            134 (0b1000_0110) — rising edge: bits 1+2 set, bit 7 set
+            6   (0b0000_0110) — drop bit 7 so the next reset also sees a rising edge
+
+        An earlier version wrote literal 0 then 128, clobbering bits 1+2 —
+        the drive never actually cleared (fault kept re-arming on the next
+        HMIS read). An even earlier RMW-bit version worked because it
+        preserved 1+2 incidentally.
         """
         try:
             async with self._conn() as conn:
-                if not await conn.write_register(REG_CONTROL, 0):
+                if not await conn.write_register(REG_CONTROL, 6):
                     return False
                 await asyncio.sleep(0.2)
-                if not await conn.write_register(REG_CONTROL, 128):
+                if not await conn.write_register(REG_CONTROL, 134):
+                    return False
+                await asyncio.sleep(0.2)
+                if not await conn.write_register(REG_CONTROL, 6):
                     return False
 
             self._last_clear_fault_time = time.time()

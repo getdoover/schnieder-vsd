@@ -135,7 +135,7 @@ class SchneiderVsdApplication(Application):
         power_kw = status.power_pct / 100.0 * self.config.max_power_kw.value
         await self.tags.vsd_power.set(round(power_kw, 2))
         await self.tags.vsd_power_pct.set(status.power_pct)
-        await self.tags.vsd_temperature.set(status.temperature_c)
+        await self.tags.vsd_thermal_load.set(status.thermal_load_pct)
         await self.tags.motor_run_hours.set(round(status.motor_run_hours, 1))
         await self.tags.di_1.set(status.di_1)
         await self.tags.di_2.set(status.di_2)
@@ -228,22 +228,22 @@ class SchneiderVsdApplication(Application):
         else:
             self._warned_overpower = False
 
-        if status.temperature_c > ot_threshold:
+        if status.thermal_load_pct > ot_threshold:
             if not self._warned_overtemperature:
                 self._warned_overtemperature = True
                 log.warning(
-                    "Overtemperature: %d C > %d C threshold",
-                    status.temperature_c, ot_threshold,
+                    "Drive thermal load: %d%% > %d%% threshold",
+                    status.thermal_load_pct, ot_threshold,
                 )
                 await self.create_message("notifications", {
-                    "title": "VSD overtemperature",
+                    "title": "VSD high thermal load",
                     "message": (
-                        f"VSD overtemperature: {status.temperature_c}°C "
-                        f"> {ot_threshold}°C"
+                        f"VSD high thermal load: {status.thermal_load_pct}% "
+                        f"> {ot_threshold}%"
                     ),
                     "body": (
-                        f"Drive temperature {status.temperature_c}°C exceeds "
-                        f"threshold {ot_threshold}°C"
+                        f"Drive thermal load {status.thermal_load_pct}% "
+                        f"exceeds threshold {ot_threshold}%"
                     ),
                     "severity": "warning",
                 })
