@@ -42,17 +42,21 @@ class SchneiderVsdConfig(config.Schema):
         description="Minimum allowed frequency setpoint",
     )
 
-    # Current scaling (varies by ATV model/configuration)
+    # Motor rating (used for overload warnings and UI colour ranges)
+    max_power_kw = config.Number(
+        "Motor Rated Power (kW)",
+        default=7.5,
+        description="Nominal motor power rating in kW. Used for "
+                    "overload warnings and power colour-coding.",
+    )
+
+    # Current scaling (varies by ATV model/configuration) — hidden; only
+    # used to populate status.current_amps for tags/logging.
     amps_divisor = config.Integer(
         "Amps Divisor",
         default=10,
         description="Divisor for motor current register value",
         hidden=True,
-    )
-    max_amps = config.Number(
-        "Max Amps",
-        default=50.0,
-        description="Nominal motor current for overcurrent warnings",
     )
 
     # Operating mode
@@ -74,10 +78,10 @@ class SchneiderVsdConfig(config.Schema):
     di_3_name = config.String("DI 3 Name", default="Digital Input 3")
 
     # Alarm thresholds
-    overcurrent_threshold = config.Number(
-        "Overcurrent Threshold (%)",
+    overpower_threshold = config.Number(
+        "Overpower Threshold (%)",
         default=110.0,
-        description="Percentage of max amps that triggers overcurrent warning",
+        description="Percentage of rated power that triggers overload warning",
         hidden=True,
     )
     overtemperature_threshold = config.Number(

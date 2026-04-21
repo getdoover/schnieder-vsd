@@ -7,6 +7,20 @@ from .app_tags import SchneiderVsdTags
 
 class SchneiderVsdUI(ui.UI):
 
+    # --- Warnings (hidden by default; toggled from application.py) ---
+    no_comms_warning = ui.WarningIndicator(
+        "No communications with VSD",
+        name="no_comms_warning",
+        hidden=True,
+        can_cancel=False,
+    )
+    motor_fault_warning = ui.WarningIndicator(
+        "Motor Fault",
+        name="motor_fault_warning",
+        hidden=True,
+        can_cancel=False,
+    )
+
     # --- Operating mode ---
     mode_selector = ui.Select(
         "Operating Mode",
@@ -31,9 +45,9 @@ class SchneiderVsdUI(ui.UI):
         "Speed", value=SchneiderVsdTags.vsd_frequency,
         units="Hz", precision=1,
     )
-    motor_current = ui.NumericVariable(
-        "Current Draw", value=SchneiderVsdTags.vsd_current,
-        units="A", precision=1,
+    motor_power = ui.NumericVariable(
+        "Motor Power", value=SchneiderVsdTags.vsd_power,
+        units="kW", precision=1,
     )
     drive_temperature = ui.NumericVariable(
         "Drive Temperature", value=SchneiderVsdTags.vsd_temperature,
@@ -116,10 +130,10 @@ class SchneiderVsdUI(ui.UI):
             ui.Range(None, temp_thresh, temp_thresh * 1.5, ui.Colour.red),
         ]
 
-        # Colour ranges for current
-        max_amps = self.config.max_amps.value
-        oc_pct = self.config.overcurrent_threshold.value / 100.0
-        self.motor_current.ranges = [
-            ui.Range(None, 0, max_amps * oc_pct, ui.Colour.green),
-            ui.Range(None, max_amps * oc_pct, max_amps * 1.5, ui.Colour.red),
+        # Colour ranges for motor power
+        max_kw = self.config.max_power_kw.value
+        op_pct = self.config.overpower_threshold.value / 100.0
+        self.motor_power.ranges = [
+            ui.Range(None, 0, max_kw * op_pct, ui.Colour.green),
+            ui.Range(None, max_kw * op_pct, max_kw * 1.5, ui.Colour.red),
         ]

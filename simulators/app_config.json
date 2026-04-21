@@ -6,7 +6,7 @@
     "max_frequency_hz": 50.0,
     "min_frequency_hz": 0.0,
     "amps_divisor": 10,
-    "max_amps": 50.0,
+    "max_power_kw": 7.5,
     "terminal_mode_label": "Float Switch",
     "di_1_name": "Float Switch",
     "di_2_name": "Pressure Switch",

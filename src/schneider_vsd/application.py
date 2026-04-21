@@ -35,7 +35,7 @@ class SchneiderVsdApplication(Application):
             min_frequency=self.config.min_frequency.value,
         )
         self._setup_done = False
-        self._warned_overcurrent = False
+        self._warned_overpower = False
         self._warned_overtemperature = False
 
     def _selected_mode(self) -> str | None:
@@ -172,36 +172,45 @@ class SchneiderVsdApplication(Application):
         )
         self.ui.reset_fault_button.hidden = not is_faulted
 
+        # Warning indicators
+        self.ui.no_comms_warning.hidden = contactable
+        self.ui.motor_fault_warning.hidden = not is_faulted
+        if is_faulted:
+            fault_desc = (status.fault_description or "").strip()
+            self.ui.motor_fault_warning.display_name = (
+                f"Motor Fault: {fault_desc}" if fault_desc else "Motor Fault"
+            )
+
     # ------------------------------------------------------------------
     # Warnings
     # ------------------------------------------------------------------
 
     async def _check_warnings(self, status: VsdStatus):
-        max_amps = self.config.max_amps.value
-        oc_threshold = max_amps * (self.config.overcurrent_threshold.value / 100.0)
+        max_kw = self.config.max_power_kw.value
+        op_threshold = max_kw * (self.config.overpower_threshold.value / 100.0)
         ot_threshold = self.config.overtemperature_threshold.value
 
-        if status.current_amps > oc_threshold:
-            if not self._warned_overcurrent:
-                self._warned_overcurrent = True
+        if status.power_kw > op_threshold:
+            if not self._warned_overpower:
+                self._warned_overpower = True
                 log.warning(
-                    "Overcurrent: %.1f A > %.1f A threshold",
-                    status.current_amps, oc_threshold,
+                    "Motor overload: %.1f kW > %.1f kW threshold",
+                    status.power_kw, op_threshold,
                 )
                 await self.create_message("notifications", {
-                    "title": "VSD overcurrent",
+                    "title": "VSD high motor load",
                     "message": (
-                        f"VSD overcurrent: {status.current_amps:.1f}A "
-                        f"> {oc_threshold:.1f}A"
+                        f"VSD high motor load: {status.power_kw:.1f}kW "
+                        f"> {op_threshold:.1f}kW"
                     ),
                     "body": (
-                        f"Motor current {status.current_amps:.1f}A exceeds "
-                        f"threshold {oc_threshold:.1f}A"
+                        f"Motor power {status.power_kw:.1f}kW exceeds "
+                        f"threshold {op_threshold:.1f}kW"
                     ),
                     "severity": "warning",
                 })
         else:
-            self._warned_overcurrent = False
+            self._warned_overpower = False
 
         if status.temperature_c > ot_threshold:
             if not self._warned_overtemperature:

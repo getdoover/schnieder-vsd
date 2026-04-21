@@ -113,6 +113,19 @@
                     "default": 0.0,
                     "x-position": 5
                 },
+                "motor_rated_power_kw": {
+                    "title": "Motor Rated Power (kW)",
+                    "x-name": "motor_rated_power_kw",
+                    "x-hidden": false,
+                    "type": [
+                        "number",
+                        "null"
+                    ],
+                    "x-required": false,
+                    "description": "Nominal motor power rating in kW. Used for overload warnings and power colour-coding.",
+                    "default": 7.5,
+                    "x-position": 6
+                },
                 "amps_divisor": {
                     "title": "Amps Divisor",
                     "x-name": "amps_divisor",
@@ -124,19 +137,6 @@
                     "x-required": false,
                     "description": "Divisor for motor current register value",
                     "default": 10,
-                    "x-position": 6
-                },
-                "max_amps": {
-                    "title": "Max Amps",
-                    "x-name": "max_amps",
-                    "x-hidden": false,
-                    "type": [
-                        "number",
-                        "null"
-                    ],
-                    "x-required": false,
-                    "description": "Nominal motor current for overcurrent warnings",
-                    "default": 50.0,
                     "x-position": 7
                 },
                 "terminal_mode_label": {
@@ -188,16 +188,16 @@
                     "default": "Digital Input 3",
                     "x-position": 11
                 },
-                "overcurrent_threshold_": {
-                    "title": "Overcurrent Threshold (%)",
-                    "x-name": "overcurrent_threshold_",
+                "overpower_threshold_": {
+                    "title": "Overpower Threshold (%)",
+                    "x-name": "overpower_threshold_",
                     "x-hidden": true,
                     "type": [
                         "number",
                         "null"
                     ],
                     "x-required": false,
-                    "description": "Percentage of max amps that triggers overcurrent warning",
+                    "description": "Percentage of rated power that triggers overload warning",
                     "default": 110.0,
                     "x-position": 12
                 },
