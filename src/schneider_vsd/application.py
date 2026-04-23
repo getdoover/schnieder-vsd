@@ -39,6 +39,11 @@ class SchneiderVsdApplication(Application):
         self._setup_done = False
         self._warned_overpower = False
         self._warned_overtemperature = False
+        # Edge-detection for event notifications. Initialised to None so the
+        # first cycle captures state without firing — avoids a phantom
+        # "started" on boot with a drive already running.
+        self._prev_running: bool | None = None
+        self._prev_faulted: bool | None = None
 
     def _selected_mode(self) -> str | None:
         # Not a @property: pydoover's rpc.register_handlers uses
@@ -98,6 +103,9 @@ class SchneiderVsdApplication(Application):
 
         # Warning checks (always active regardless of mode)
         await self._check_warnings(status)
+
+        # Event notifications — fire on state transitions if configured
+        await self._check_event_notifications(status)
 
     # ------------------------------------------------------------------
     # Operating mode
@@ -258,6 +266,46 @@ class SchneiderVsdApplication(Application):
                 })
         else:
             self._warned_overtemperature = False
+
+    async def _check_event_notifications(self, status: VsdStatus):
+        """Post notifications on state transitions (started/stopped/fault).
+
+        Skipped on the very first cycle — we record the state so later
+        comparisons detect real edges, not the boot-time snapshot.
+        """
+        is_running = bool(status.is_running)
+        is_faulted = bool(status.is_faulted)
+        notif = self.config.notifications
+        name = self.app_display_name
+
+        if self._prev_running is not None:
+            if is_running and not self._prev_running and notif.on_start.value:
+                await self.create_message("notifications", {
+                    "title": f"{name} started",
+                    "message": f"{name} motor started",
+                    "body": f"Motor started at {status.frequency_hz:.1f} Hz",
+                    "severity": "info",
+                })
+            elif not is_running and self._prev_running and notif.on_stop.value:
+                await self.create_message("notifications", {
+                    "title": f"{name} stopped",
+                    "message": f"{name} motor stopped",
+                    "body": "Motor stopped",
+                    "severity": "info",
+                })
+
+        if self._prev_faulted is not None:
+            if is_faulted and not self._prev_faulted and notif.on_fault.value:
+                fault_desc = (status.fault_description or "").strip() or "Unknown fault"
+                await self.create_message("notifications", {
+                    "title": f"{name} fault",
+                    "message": f"{name} fault: {fault_desc}",
+                    "body": f"Drive faulted: {fault_desc}",
+                    "severity": "error",
+                })
+
+        self._prev_running = is_running
+        self._prev_faulted = is_faulted
 
     # ------------------------------------------------------------------
     # UI handlers

@@ -3,6 +3,28 @@
 from pydoover import config
 
 
+class NotificationsConfig(config.Object):
+    """Per-event notification toggles.
+
+    Drive state transitions are edge-detected in the main loop; a
+    notification is posted to the `notifications` channel only when a
+    toggled event actually transitions (e.g. not-running → running).
+    """
+
+    on_start = config.Boolean(
+        "Notify on Start", default=False,
+        description="Send a notification each time the motor starts running.",
+    )
+    on_stop = config.Boolean(
+        "Notify on Stop", default=False,
+        description="Send a notification each time the motor stops.",
+    )
+    on_fault = config.Boolean(
+        "Notify on Fault", default=True,
+        description="Send a notification each time the drive enters a fault state.",
+    )
+
+
 class SchneiderVsdConfig(config.Schema):
 
     # VSD model
@@ -82,6 +104,12 @@ class SchneiderVsdConfig(config.Schema):
     di_1_name = config.String("DI 1 Name", default="Digital Input 1")
     di_2_name = config.String("DI 2 Name", default="Digital Input 2")
     di_3_name = config.String("DI 3 Name", default="Digital Input 3")
+
+    # Event notifications
+    notifications = NotificationsConfig(
+        "Notifications",
+        description="Choose which drive events post to the notifications channel.",
+    )
 
     # Comms watchdog — the drive faults on Modbus silence beyond this timeout.
     # Factory default is 10 s which is too tight for a typical container

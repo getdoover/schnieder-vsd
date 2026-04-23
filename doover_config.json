@@ -189,6 +189,60 @@
                     "default": "Digital Input 3",
                     "x-position": 11
                 },
+                "notifications": {
+                    "title": "Notifications",
+                    "x-name": "notifications",
+                    "x-hidden": false,
+                    "type": "object",
+                    "x-required": true,
+                    "description": "Choose which drive events post to the notifications channel.",
+                    "x-position": 12,
+                    "properties": {
+                        "notify_on_start": {
+                            "title": "Notify on Start",
+                            "x-name": "notify_on_start",
+                            "x-hidden": false,
+                            "type": [
+                                "boolean",
+                                "null"
+                            ],
+                            "x-required": false,
+                            "description": "Send a notification each time the motor starts running.",
+                            "default": false,
+                            "x-position": 1
+                        },
+                        "notify_on_stop": {
+                            "title": "Notify on Stop",
+                            "x-name": "notify_on_stop",
+                            "x-hidden": false,
+                            "type": [
+                                "boolean",
+                                "null"
+                            ],
+                            "x-required": false,
+                            "description": "Send a notification each time the motor stops.",
+                            "default": false,
+                            "x-position": 2
+                        },
+                        "notify_on_fault": {
+                            "title": "Notify on Fault",
+                            "x-name": "notify_on_fault",
+                            "x-hidden": false,
+                            "type": [
+                                "boolean",
+                                "null"
+                            ],
+                            "x-required": false,
+                            "description": "Send a notification each time the drive enters a fault state.",
+                            "default": true,
+                            "x-position": 3
+                        }
+                    },
+                    "additionalElements": true,
+                    "required": [],
+                    "x-collapsible": true,
+                    "x-defaultCollapsed": false
+                },
                 "modbus_timeout_seconds": {
                     "title": "Modbus Timeout (seconds)",
                     "x-name": "modbus_timeout_seconds",
@@ -200,7 +254,7 @@
                     "x-required": false,
                     "description": "How long the drive waits with no Modbus requests before treating it as comms loss. Max 30 s per Schneider. Set high enough to cover a container restart.",
                     "default": 30.0,
-                    "x-position": 12
+                    "x-position": 13
                 },
                 "stop_motor_on_comms_loss": {
                     "title": "Stop Motor on Comms Loss",
@@ -213,7 +267,7 @@
                     "x-required": false,
                     "description": "If true, drive freewheel-stops the motor when Modbus comms are lost beyond the timeout. If false, drive keeps running \u2014 use only when loss of remote monitoring alone shouldn't stop the pump.",
                     "default": true,
-                    "x-position": 13
+                    "x-position": 14
                 },
                 "overpower_threshold_": {
                     "title": "Overpower Threshold (%)",
@@ -226,7 +280,7 @@
                     "x-required": false,
                     "description": "Percentage of rated power that triggers overload warning",
                     "default": 110.0,
-                    "x-position": 14
+                    "x-position": 15
                 },
                 "overtemperature_threshold_c": {
                     "title": "Overtemperature Threshold (C)",
@@ -239,7 +293,7 @@
                     "x-required": false,
                     "description": "Drive temperature alarm threshold in degrees C",
                     "default": 80.0,
-                    "x-position": 15
+                    "x-position": 16
                 },
                 "dv-app-position": {
                     "title": "Position",
@@ -252,12 +306,14 @@
                     "x-required": false,
                     "description": "Position of Application in UI Structure. Smaller numbers are closer to the top.",
                     "default": 100,
-                    "x-position": 16,
+                    "x-position": 17,
                     "minimum": 0
                 }
             },
             "additionalElements": true,
-            "required": []
+            "required": [
+                "notifications"
+            ]
         }
     }
 }
