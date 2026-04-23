@@ -194,9 +194,16 @@ class SchneiderVsdApplication(Application):
         in_terminals = self._is_terminal_mode()
         is_running = contactable and status.is_running
         is_faulted = contactable and status.is_faulted
+        # Drive is running but the remote-mode latch isn't asserted — it
+        # was started locally (HMI/terminal). Frequency setpoint writes
+        # would be no-ops in this state; hide the input and surface a
+        # warning instead.
+        started_locally = (
+            is_running and not status.remote_channel_active
+        )
 
         await self.tags.hide_frequency_setpoint.set(
-            in_terminals or not contactable
+            in_terminals or not contactable or started_locally
         )
         await self.tags.hide_start_button.set(
             in_terminals or is_running or not contactable
@@ -208,6 +215,7 @@ class SchneiderVsdApplication(Application):
 
         await self.tags.hide_no_comms_warning.set(contactable)
         await self.tags.hide_motor_fault_warning.set(not is_faulted)
+        await self.tags.hide_local_run_warning.set(not started_locally)
         if is_faulted:
             fault_desc = (status.fault_description or "").strip()
             label = f"Motor Fault: {fault_desc}" if fault_desc else "Motor Fault"

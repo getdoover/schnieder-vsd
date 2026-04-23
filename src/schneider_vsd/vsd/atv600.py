@@ -121,6 +121,12 @@ class ATV600(VsdBase):
         super().__init__(**kwargs)
         self._last_target_freq: float | None = None
         self._config_applied: bool = False
+        # Tracks whether CMD bits 1+2 (remote-mode latch) are currently
+        # asserted. While True, the drive ignores HMI/terminal commands —
+        # we clear the latch once the drive is safely idle so the panel
+        # can initiate the next start. Fire-once-per-stop via this flag to
+        # avoid EEPROM wear on repeated R/WS writes.
+        self._remote_latched: bool | None = None
 
     @property
     def config_applied(self) -> bool:
@@ -253,9 +259,11 @@ class ATV600(VsdBase):
                     return status
 
                 io_regs = await conn.read_holding_registers(5200, 50)
-                # Retained from vsd_control for behavioural parity; result is
-                # unused today. Do not remove without verifying on hardware.
-                await conn.read_holding_registers(8400, 125)
+                # Config block — retained from vsd_control for behavioural
+                # parity. We parse CMD out of it (8501) to tell whether the
+                # remote-mode latch is currently asserted (i.e. whether our
+                # Ethernet channel is actively commanding the drive).
+                config_regs = await conn.read_holding_registers(8400, 125)
 
                 # Only pay for the LFT read when the drive is signalling a fault.
                 fault_reg = None
@@ -296,6 +304,16 @@ class ATV600(VsdBase):
                     reg_int16(io_regs, (REG_AI1_PHYSICAL - 5200) + i)
                     for i in range(NUM_ANALOG_INPUTS)
                 ]
+
+            # --- Parse control word ---
+            if config_regs is not None:
+                cw = reg_uint16(config_regs, REG_CONTROL - 8400)
+                status.control_word = cw
+                # Bits 1+2 are the remote-mode latch under CCS=242/CHCF=3.
+                # When set, the drive is listening to our Ethernet CMD and
+                # LFR. When clear, it's following its local command source
+                # (terminals / HMI).
+                status.remote_channel_active = bool(cw & 0b0110)
 
             # --- Fault code ---
             if fault_reg:
@@ -347,17 +365,24 @@ class ATV600(VsdBase):
             return False
 
     async def stop_motor(self) -> bool:
-        """Stop the motor and return to remote-ready-local mode."""
+        """Stop the motor via atomic takeover-and-stop.
+
+        Writes CMD=6 (0b00000110): bits 1+2 set = remote-mode latch, bit 0
+        clear = no run. This single atomic write takes control of the
+        drive's command channel AND clears the run bit — works whether
+        the drive was commanded by HMI, terminal wiring, or remote, so
+        operators can shut down manually-started pumps from the app.
+
+        Post-stop mode cleanup (`_set_remote_ready_local`) is handled by
+        `manage_operating_state` once the drive reaches idle — we don't
+        call it here because it writes R/WS registers that are rejected
+        while the motor is still decelerating.
+        """
         try:
-            await self._switch_to_remote()
-            await asyncio.sleep(0.2)
-
             async with self._conn() as conn:
-                if not await conn.write_register_bits(REG_CONTROL, bits_to_unset=[0]):
+                if not await conn.write_register(REG_CONTROL, 6):
                     return False
-
-            await asyncio.sleep(0.5)
-            await self._set_remote_ready_local()
+            self._remote_latched = True
             log.info("ATV600 stop command sent")
             return True
 
@@ -366,15 +391,21 @@ class ATV600(VsdBase):
             return False
 
     async def set_target_freq(self, frequency_hz: float) -> bool:
-        """Set speed reference frequency (clamped to configured range)."""
+        """Set speed reference frequency (clamped to configured range).
+
+        LFR (8502) is R/W and accepts writes at any time. The drive only
+        *uses* it as the active reference when the remote-mode latch is
+        asserted (bits 1+2 of CMD) — during a remote run, or right after
+        `_switch_to_remote` is called from `start_motor` or `stop_motor`.
+        Writing LFR here without asserting the latch avoids an idle →
+        remote → ready-local cycle every time the operator tweaks the
+        setpoint, which would needlessly wear the R/WS source-assignment
+        registers (RF1B, CD2, RF1, CD1).
+        """
         frequency_hz = max(self.min_frequency, min(self.max_frequency, frequency_hz))
         register_value = int(frequency_hz * 10)
 
         try:
-            if self._last_target_freq != frequency_hz:
-                await self._switch_to_remote()
-                await asyncio.sleep(0.2)
-
             async with self._conn() as conn:
                 if not await conn.write_register(REG_SPEED_SET, register_value):
                     return False
@@ -449,38 +480,46 @@ class ATV600(VsdBase):
                 await asyncio.sleep(0.5)
                 await self._set_remote_ready_local()
 
-        # If idle and enough time since last start, ensure remote-ready-local
+        # Post-idle cleanup: release the CMD bits 1+2 remote-mode latch so
+        # the panel HMI / terminal can initiate the next start. Fires once
+        # per stop cycle via the _remote_latched flag — avoids repeat R/WS
+        # writes to RF1/RF1B/CD1/CD2 and the associated EEPROM wear.
         elif not self._last_status.is_running:
-            if time.time() - self._last_start_time > 20:
-                if self._last_status.hmis_state == 3:  # freewheel (NST)
-                    await self._set_remote_ready_local()
+            if (self._remote_latched is not False
+                    and self._last_status.hmis_state in (2, 3)
+                    and time.time() - self._last_start_time > 2):
+                await self._set_remote_ready_local()
 
     # ------------------------------------------------------------------
     # Internal mode-switching commands
     # ------------------------------------------------------------------
 
     async def _switch_to_remote(self) -> bool:
-        """Switch to full remote (Embedded Ethernet) control.
+        """Switch to remote (Embedded Ethernet) command control.
 
-        RF1B/CD2 are R/WS (write-when-stopped). Attempting to change them
-        while the motor is running returns SLAVE_DEVICE_FAILURE (ex 4). If
-        the motor is already running we're already in remote mode by
-        definition, so this becomes a no-op.
+        Asserts bits 1+2 of CMD — the remote-mode latch under this drive's
+        I/O profile (CCS=242, CHCF=3). Bits 1+2 tell the drive to listen to
+        CMD2 (the Ethernet command register). CMD itself is R/W so this
+        works whether the motor is running or stopped — which lets us take
+        control of a drive that was manually started from the HMI or
+        terminals.
+
+        RF1B/CD2 source-assignment registers are R/WS (write-when-stopped)
+        and get rejected with SLAVE_DEVICE_FAILURE while the motor runs.
+        They're persisted in drive EEPROM by our idle setup routine, so
+        skipping them mid-run leaves them at the correct values.
         """
-        if self._last_status and self._last_status.is_running:
-            return True
-
         try:
             async with self._conn() as conn:
-                ok = all([
-                    await conn.write_register(REG_RF1B, 171),
-                    await conn.write_register(REG_CD2, 40),
-                ])
-                if not ok:
-                    return False
-                return await conn.write_register_bits(
+                if not (self._last_status and self._last_status.is_running):
+                    await conn.write_register(REG_RF1B, 171)
+                    await conn.write_register(REG_CD2, 40)
+                ok = await conn.write_register_bits(
                     REG_CONTROL, bits_to_set=[1, 2],
                 )
+            if ok:
+                self._remote_latched = True
+            return ok
         except Exception as e:
             log.error("Failed to switch to remote: %s", e)
             return False
@@ -505,9 +544,12 @@ class ATV600(VsdBase):
                 ])
                 if not ok:
                     return False
-                return await conn.write_register_bits(
+                result = await conn.write_register_bits(
                     REG_CONTROL, bits_to_unset=[1, 2],
                 )
+            if result:
+                self._remote_latched = False
+            return result
         except Exception as e:
             log.error("Failed to set remote-ready-local: %s", e)
             return False

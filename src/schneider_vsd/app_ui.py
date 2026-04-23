@@ -16,6 +16,7 @@ _HIDE_RESET = "$tag.app().hide_reset_fault_button:boolean:true"
 _HIDE_FREQ = "$tag.app().hide_frequency_setpoint:boolean:true"
 _HIDE_NO_COMMS = "$tag.app().hide_no_comms_warning:boolean:true"
 _HIDE_MOTOR_FAULT = "$tag.app().hide_motor_fault_warning:boolean:true"
+_HIDE_LOCAL_RUN = "$tag.app().hide_local_run_warning:boolean:true"
 _MOTOR_FAULT_LABEL = '$tag.app().motor_fault_label:string:"Motor Fault"'
 _APP_DISPLAY_NAME = '$tag.app().app_display_name:string:"Schneider VSD"'
 
@@ -83,6 +84,16 @@ class SchneiderVsdUI(ui.UI, display_name=_APP_DISPLAY_NAME):
     di_3 = ui.BooleanVariable("Digital Input 3", value=SchneiderVsdTags.di_3, icon="toggle-on")
 
     # --- Control (top-level; runtime hide bound to tags) ---
+    local_run_warning = ui.TextVariable(
+        "Drive was started locally. Frequency cannot be adjusted remotely "
+        "after a local start. Press Stop to take remote control, then "
+        "restart to regain remote frequency control.",
+        value="",
+        name="local_run_warning",
+        hidden=_HIDE_LOCAL_RUN,
+        icon="triangle-exclamation",
+        colour="tomato",
+    )
     frequency_setpoint = ui.FloatInput(
         "Frequency Setpoint", units="Hz", precision=1,
         hidden=_HIDE_FREQ,

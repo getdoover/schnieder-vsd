@@ -47,4 +47,5 @@ class SchneiderVsdTags(Tags):
     hide_frequency_setpoint = Tag("boolean", default=True)
     hide_no_comms_warning = Tag("boolean", default=True)
     hide_motor_fault_warning = Tag("boolean", default=True)
+    hide_local_run_warning = Tag("boolean", default=True)
     motor_fault_label = Tag("string", default="Motor Fault")

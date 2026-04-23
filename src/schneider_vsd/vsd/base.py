@@ -37,6 +37,12 @@ class VsdStatus:
     thermal_load_pct: float = 0.0  # THD, drive thermal state (% — 100% = nominal)
     motor_run_hours: float = 0.0
 
+    # Command channel state (model-specific — ATV600 uses bits 1+2 of CMD
+    # as the remote-mode latch under CCS=242/CHCF=3). True means our
+    # Ethernet CMD register is the active command+reference source.
+    control_word: int = 0
+    remote_channel_active: bool = False
+
     # Fault info
     fault_code: int = 0
     fault_description: str = ""
