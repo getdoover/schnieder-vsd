@@ -413,7 +413,16 @@ class ATV600(VsdBase):
     # ------------------------------------------------------------------
 
     async def _switch_to_remote(self) -> bool:
-        """Switch to full remote (Embedded Ethernet) control."""
+        """Switch to full remote (Embedded Ethernet) control.
+
+        RF1B/CD2 are R/WS (write-when-stopped). Attempting to change them
+        while the motor is running returns SLAVE_DEVICE_FAILURE (ex 4). If
+        the motor is already running we're already in remote mode by
+        definition, so this becomes a no-op.
+        """
+        if self._last_status and self._last_status.is_running:
+            return True
+
         try:
             async with self._conn() as conn:
                 ok = all([
@@ -430,7 +439,15 @@ class ATV600(VsdBase):
             return False
 
     async def _set_remote_ready_local(self) -> bool:
-        """Remote-ready-local: drive is ready for remote but defaults to local HMI."""
+        """Remote-ready-local: drive is ready for remote but defaults to local HMI.
+
+        RF1/RF1B/CD1/CD2 are R/WS. While the motor runs these writes return
+        SLAVE_DEVICE_FAILURE. manage_operating_state re-applies this once
+        the drive goes idle, so skipping during run is safe.
+        """
+        if self._last_status and self._last_status.is_running:
+            return True
+
         try:
             async with self._conn() as conn:
                 ok = all([
