@@ -121,9 +121,11 @@ class SchneiderVsdUI(ui.UI, display_name=_APP_DISPLAY_NAME):
             # to terminal control so Modbus commands don't fight the wiring.
             self.mode_selector.default = "terminal_control"
 
-        # Frequency input range
+        # Frequency input range + sensible default so start_motor has
+        # something non-zero to push to LFR on fresh installs.
         self.frequency_setpoint.min_val = self.config.min_frequency.value
         self.frequency_setpoint.max_val = self.config.max_frequency.value
+        self.frequency_setpoint.default = self.config.max_frequency.value
 
         # Digital input labels — hide any DI whose config value is blank or
         # still at the literal default "Digital Input N".

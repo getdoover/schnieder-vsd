@@ -65,6 +65,8 @@ class VsdBase(abc.ABC):
         amps_divisor: int = 10,
         max_frequency: float = 50.0,
         min_frequency: float = 0.0,
+        modbus_timeout_seconds: float = 30.0,
+        stop_on_comms_loss: bool = True,
     ):
         self.host = host
         self.port = port
@@ -73,6 +75,8 @@ class VsdBase(abc.ABC):
         self.amps_divisor = amps_divisor
         self.max_frequency = max_frequency
         self.min_frequency = min_frequency
+        self.modbus_timeout_seconds = modbus_timeout_seconds
+        self.stop_on_comms_loss = stop_on_comms_loss
 
         self._contactable = False
         self._last_status: VsdStatus | None = None

@@ -33,6 +33,8 @@ class SchneiderVsdApplication(Application):
             amps_divisor=int(self.config.amps_divisor.value),
             max_frequency=self.config.max_frequency.value,
             min_frequency=self.config.min_frequency.value,
+            modbus_timeout_seconds=self.config.modbus_timeout_seconds.value,
+            stop_on_comms_loss=self.config.stop_on_comms_loss.value,
         )
         self._setup_done = False
         self._warned_overpower = False
@@ -76,6 +78,13 @@ class SchneiderVsdApplication(Application):
             await self._set_disconnected()
             self._setup_done = False
             return
+
+        # Deferred config: if setup came up in read-only mode (drive was
+        # running at boot), retry the full config as soon as drive is idle.
+        if not self.vsd.config_applied and not status.is_running:
+            log.info("Drive now idle — running deferred configuration")
+            if await self.vsd.run_setup():
+                log.info("Deferred configuration complete")
 
         # Push all values to tags
         await self._update_tags(status)
@@ -273,6 +282,17 @@ class SchneiderVsdApplication(Application):
         if not self.vsd.is_contactable:
             log.warning("Start rejected — VSD not contactable")
             return
+        # Push the speed setpoint to the drive before asserting RUN — otherwise
+        # the drive sits in HMIS=2 (ready) with RUN latched but no reference.
+        setpoint = self.ui_manager.get_value("frequency_setpoint")
+        try:
+            setpoint = float(setpoint) if setpoint is not None else 0.0
+        except (TypeError, ValueError):
+            setpoint = 0.0
+        if setpoint <= 0:
+            setpoint = self.config.max_frequency.value
+            log.info("Frequency setpoint unset; defaulting to %.1f Hz", setpoint)
+        await self.vsd.set_target_freq(setpoint)
         log.info("Start command received")
         await self.vsd.start_motor()
 

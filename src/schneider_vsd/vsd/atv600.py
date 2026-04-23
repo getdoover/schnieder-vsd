@@ -51,6 +51,8 @@ REG_SPEED_SET = 8502        # Speed setpoint, Hz * 10
 
 # Setup-only registers
 REG_RSF = 7124              # Fault reset assignment
+REG_TTO = 6005              # Modbus timeout, 0.1 s units (max 300 = 30 s)
+REG_ETHL = 7021             # Ethernet error response (0=Ignore, 1=Freewheel)
 REG_BMP = 13529             # BMP — disable local-only mode lockout
 
 # Diagnostic — single-register read outside the batched blocks
@@ -118,6 +120,17 @@ class ATV600(VsdBase):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self._last_target_freq: float | None = None
+        self._config_applied: bool = False
+
+    @property
+    def config_applied(self) -> bool:
+        """True once the R/WS config writes have successfully landed.
+
+        False when setup was skipped (e.g. drive running at container
+        boot). Callers should re-invoke run_setup once the drive goes
+        idle to complete the deferred config.
+        """
+        return self._config_applied
 
     def _conn(self) -> ModbusTcpConnection:
         return ModbusTcpConnection(self.host, self.port, self.slave_id, self.timeout)
@@ -135,19 +148,49 @@ class ATV600(VsdBase):
         - CHCF: I/O control mode
         - RCB: reference freq switching via Embedded Ethernet
         - CCS: command channel switching via Embedded Ethernet
+        - TTO: Modbus TCP timeout (keeps drive running across short comms
+          gaps like container restarts)
+        - ETHL: Ethernet error response (freewheel vs ignore)
 
         Then sets remote-ready-local as default operating mode.
         If the drive is faulted, attempts to clear the fault.
+
+        If the drive is already running when setup runs (e.g. container
+        restart mid-run), the R/WS config writes are skipped — they'd
+        return SLAVE_DEVICE_FAILURE (ex 4) and we don't want the log spam.
+        The drive keeps its previous EEPROM-persisted config, so we just
+        mark contactable and exit. `config_applied` stays False so the
+        caller can re-run setup once the drive next goes idle.
         """
         try:
+            status = await self.read_status()
+            if not status.contactable:
+                return False
+
+            if status.is_running:
+                log.info(
+                    "ATV600 already running at startup (%s:%d) — skipping "
+                    "config writes. Config will be re-applied when drive "
+                    "next goes idle.",
+                    self.host, self.port,
+                )
+                self._contactable = True
+                return True
+
+            # Cap TTO at 30 s (drive limit); unit is 0.1 s.
+            tto_ticks = max(1, min(300, int(self.modbus_timeout_seconds * 10)))
+            ethl_value = 1 if self.stop_on_comms_loss else 0
+
             async with self._conn() as conn:
-                # Base config — RCB and CCS can't be changed while running
+                # Base config — RCB/CCS/RF1*/CD* can't be changed while running
                 ok = all([
                     await conn.write_register(REG_BMP, 2),
                     await conn.write_register(REG_RSF, 247),
                     await conn.write_register(REG_CHCF, 3),
                     await conn.write_register(REG_RCB, 241),
                     await conn.write_register(REG_CCS, 242),
+                    await conn.write_register(REG_TTO, tto_ticks),
+                    await conn.write_register(REG_ETHL, ethl_value),
                 ])
                 if not ok:
                     log.error("Failed to write base configuration registers")
@@ -172,7 +215,11 @@ class ATV600(VsdBase):
                     return False
 
             self._contactable = True
-            log.info("ATV600 setup complete (%s:%d)", self.host, self.port)
+            self._config_applied = True
+            log.info(
+                "ATV600 setup complete (%s:%d) — TTO=%.1fs, ETHL=%d",
+                self.host, self.port, tto_ticks / 10.0, ethl_value,
+            )
             return True
 
         except Exception as e:
