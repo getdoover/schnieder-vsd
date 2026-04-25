@@ -43,6 +43,12 @@ class VsdStatus:
     control_word: int = 0
     remote_channel_active: bool = False
 
+    # Drive-configured speed limits (LSP/HSP, read from the drive each cycle).
+    # When LSP == HSP the drive clamps to a single speed — remote setpoint
+    # changes become no-ops until an operator lowers LSP on the panel.
+    low_speed_hz: float = 0.0
+    high_speed_hz: float = 0.0
+
     # Fault info
     fault_code: int = 0
     fault_description: str = ""
@@ -52,7 +58,7 @@ class VsdStatus:
     di_2: bool = False
     di_3: bool = False
 
-    # Analog inputs (AI1C..AI5C physical scaled values)
+    # Analog inputs (AI1I..AI5I raw physical image, 0..8192 ≡ 0..20mA)
     ai_values: list[float] = field(default_factory=lambda: [0.0, 0.0, 0.0, 0.0, 0.0])
 
     # Raw registers for debugging

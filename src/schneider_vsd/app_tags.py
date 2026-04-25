@@ -32,7 +32,7 @@ class SchneiderVsdTags(Tags):
     di_2 = Tag("boolean", default=None)
     di_3 = Tag("boolean", default=None)
 
-    # Analog inputs (physical scaled values from AI1C..AI5C)
+    # Analog inputs (raw physical image from AI1I..AI5I, 0..8192 ≡ 0..20mA)
     ai_1 = Tag("number", default=None)
     ai_2 = Tag("number", default=None)
     ai_3 = Tag("number", default=None)
@@ -48,4 +48,6 @@ class SchneiderVsdTags(Tags):
     hide_no_comms_warning = Tag("boolean", default=True)
     hide_motor_fault_warning = Tag("boolean", default=True)
     hide_local_run_warning = Tag("boolean", default=True)
+    hide_lsp_locked_warning = Tag("boolean", default=True)
     motor_fault_label = Tag("string", default="Motor Fault")
+    lsp_locked_label = Tag("string", default="Drive locked at a single speed")

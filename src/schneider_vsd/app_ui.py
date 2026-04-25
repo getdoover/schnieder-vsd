@@ -17,6 +17,8 @@ _HIDE_FREQ = "$tag.app().hide_frequency_setpoint:boolean:true"
 _HIDE_NO_COMMS = "$tag.app().hide_no_comms_warning:boolean:true"
 _HIDE_MOTOR_FAULT = "$tag.app().hide_motor_fault_warning:boolean:true"
 _HIDE_LOCAL_RUN = "$tag.app().hide_local_run_warning:boolean:true"
+_HIDE_LSP_LOCKED = "$tag.app().hide_lsp_locked_warning:boolean:true"
+_LSP_LOCKED_LABEL = '$tag.app().lsp_locked_label:string:"Drive locked at a single speed"'
 _MOTOR_FAULT_LABEL = '$tag.app().motor_fault_label:string:"Motor Fault"'
 _APP_DISPLAY_NAME = '$tag.app().app_display_name:string:"Schneider VSD"'
 
@@ -91,6 +93,14 @@ class SchneiderVsdUI(ui.UI, display_name=_APP_DISPLAY_NAME):
         value="",
         name="local_run_warning",
         hidden=_HIDE_LOCAL_RUN,
+        icon="triangle-exclamation",
+        colour="tomato",
+    )
+    lsp_locked_warning = ui.TextVariable(
+        _LSP_LOCKED_LABEL,
+        value="",
+        name="lsp_locked_warning",
+        hidden=_HIDE_LSP_LOCKED,
         icon="triangle-exclamation",
         colour="tomato",
     )

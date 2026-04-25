@@ -32,9 +32,14 @@ REG_POWER_PCT = 3211        # OPR — motor power, 1 % (signed, % of nominal)
 REG_STATUS = 3240           # HMIS — device state enumeration
 REG_MOTOR_TIME = 3244       # RTH — motor run time, uint32 seconds
 
+# Speed limits block — batch read 3103..3106 (4 regs, FC3)
+REG_TFR = 3103              # TFR — max frequency ceiling, 0.1 Hz
+REG_HSP = 3104              # HSP — high speed limit, 0.1 Hz
+REG_LSP = 3105              # LSP — low speed limit, 0.1 Hz
+
 # I/O block — batch read 5200..5249 (50 regs, FC3)
 REG_DIGITAL_IN = 5202       # IL1R — logic inputs (bit0=DI1, bit1=DI2, ...)
-REG_AI1_PHYSICAL = 5242     # AI1C..AI5C — physical (scaled) values at 5242..5246
+REG_AI1_RAW = 5222          # AI1I..AI5I — input physical image, 0..8192 ≡ 0..20mA at 5222..5226
 
 # Config block — batch read 8400..8524 (125 regs, FC3) [unused, retained for parity]
 REG_CHCF = 8401             # I/O control mode
@@ -264,6 +269,9 @@ class ATV600(VsdBase):
                 # remote-mode latch is currently asserted (i.e. whether our
                 # Ethernet channel is actively commanding the drive).
                 config_regs = await conn.read_holding_registers(8400, 125)
+                # Speed limits — TFR/HSP/LSP. Read each cycle so UI can
+                # react if an operator changes LSP on the drive HMI.
+                speed_limit_regs = await conn.read_holding_registers(REG_TFR, 3)
 
                 # Only pay for the LFT read when the drive is signalling a fault.
                 fault_reg = None
@@ -299,9 +307,12 @@ class ATV600(VsdBase):
                 status.di_1 = bool(di & 0x01)
                 status.di_2 = bool(di & 0x02)
                 status.di_3 = bool(di & 0x04)
-                # AI1C..AI5C — physical values (scaled per drive config)
+                # AI1I..AI5I — raw physical image, 0..8192 ≡ 0..20mA.
+                # Engineering conversion (4-20mA, range, units) lives in
+                # downstream config so it isn't dependent on drive-side
+                # AI1J/AI1K/CRL1/CRH1 parameters that operators can change.
                 status.ai_values = [
-                    reg_int16(io_regs, (REG_AI1_PHYSICAL - 5200) + i)
+                    reg_int16(io_regs, (REG_AI1_RAW - 5200) + i)
                     for i in range(NUM_ANALOG_INPUTS)
                 ]
 
@@ -314,6 +325,12 @@ class ATV600(VsdBase):
                 # LFR. When clear, it's following its local command source
                 # (terminals / HMI).
                 status.remote_channel_active = bool(cw & 0b0110)
+
+            # --- Parse speed limits ---
+            if speed_limit_regs is not None:
+                # Layout: [TFR, HSP, LSP] at 3103, 3104, 3105.
+                status.high_speed_hz = reg_uint16(speed_limit_regs, 1) / 10.0
+                status.low_speed_hz = reg_uint16(speed_limit_regs, 2) / 10.0
 
             # --- Fault code ---
             if fault_reg:

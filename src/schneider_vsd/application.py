@@ -201,9 +201,17 @@ class SchneiderVsdApplication(Application):
         started_locally = (
             is_running and not status.remote_channel_active
         )
+        # LSP == HSP: drive clamps any reference to that single value, so
+        # remote frequency adjustments have no effect until the operator
+        # lowers LSP on the drive HMI.
+        speed_locked = (
+            contactable
+            and status.low_speed_hz > 0
+            and status.low_speed_hz == status.high_speed_hz
+        )
 
         await self.tags.hide_frequency_setpoint.set(
-            in_terminals or not contactable or started_locally
+            in_terminals or not contactable or started_locally or speed_locked
         )
         await self.tags.hide_start_button.set(
             in_terminals or is_running or not contactable
@@ -216,6 +224,13 @@ class SchneiderVsdApplication(Application):
         await self.tags.hide_no_comms_warning.set(contactable)
         await self.tags.hide_motor_fault_warning.set(not is_faulted)
         await self.tags.hide_local_run_warning.set(not started_locally)
+        await self.tags.hide_lsp_locked_warning.set(not speed_locked)
+        if speed_locked:
+            await self.tags.lsp_locked_label.set(
+                f"Drive is locked at {status.low_speed_hz:.0f} Hz "
+                f"(LSP equals HSP). Lower LSP on the drive panel to "
+                f"enable remote speed control."
+            )
         if is_faulted:
             fault_desc = (status.fault_description or "").strip()
             label = f"Motor Fault: {fault_desc}" if fault_desc else "Motor Fault"
