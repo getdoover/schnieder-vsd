@@ -4,6 +4,7 @@ import logging
 
 from pydoover import ui
 from pydoover.docker import Application
+from pydoover.models import NotificationSeverity
 
 from .app_config import SchneiderVsdConfig
 from .app_tags import SchneiderVsdTags
@@ -237,6 +238,34 @@ class SchneiderVsdApplication(Application):
             await self.tags.motor_fault_label.set(label)
 
     # ------------------------------------------------------------------
+    # Notifications
+    # ------------------------------------------------------------------
+
+    async def _notify(
+        self,
+        message: str,
+        title: str | None = None,
+        severity: NotificationSeverity = NotificationSeverity.Info,
+    ):
+        """Post a message to the `notifications` channel.
+
+        The payload must match the server's NotificationChannelMessagePayload
+        (`message`, `title`, `severity`, `topic`) — anything else is ignored.
+        `severity` is matched *exactly* against the variant names, so "Info"
+        and "Warn" work but "info", "warning" and "error" do not. On a parse
+        failure the server silently falls back to using the raw JSON payload
+        as the notification text — which is what turned this app's earlier
+        lowercase severities into a wall of JSON on subscribers' phones.
+
+        The name is also the encoding that works against every server
+        version; integers are only accepted by builds from 2026-07-13 on.
+        """
+        payload = {"message": message, "severity": severity.name}
+        if title is not None:
+            payload["title"] = title
+        await self.create_message("notifications", payload)
+
+    # ------------------------------------------------------------------
     # Warnings
     # ------------------------------------------------------------------
 
@@ -253,18 +282,14 @@ class SchneiderVsdApplication(Application):
                     "Motor overload: %.1f kW > %.1f kW threshold",
                     power_kw, op_threshold,
                 )
-                await self.create_message("notifications", {
-                    "title": "VSD high motor load",
-                    "message": (
-                        f"VSD high motor load: {power_kw:.1f}kW "
-                        f"> {op_threshold:.1f}kW"
-                    ),
-                    "body": (
+                await self._notify(
+                    title=f"{self.app_display_name} high motor load",
+                    message=(
                         f"Motor power {power_kw:.1f}kW exceeds "
                         f"threshold {op_threshold:.1f}kW"
                     ),
-                    "severity": "warning",
-                })
+                    severity=NotificationSeverity.Warn,
+                )
         else:
             self._warned_overpower = False
 
@@ -275,18 +300,14 @@ class SchneiderVsdApplication(Application):
                     "Drive thermal load: %d%% > %d%% threshold",
                     status.thermal_load_pct, ot_threshold,
                 )
-                await self.create_message("notifications", {
-                    "title": "VSD high thermal load",
-                    "message": (
-                        f"VSD high thermal load: {status.thermal_load_pct}% "
-                        f"> {ot_threshold}%"
-                    ),
-                    "body": (
+                await self._notify(
+                    title=f"{self.app_display_name} high thermal load",
+                    message=(
                         f"Drive thermal load {status.thermal_load_pct}% "
                         f"exceeds threshold {ot_threshold}%"
                     ),
-                    "severity": "warning",
-                })
+                    severity=NotificationSeverity.Warn,
+                )
         else:
             self._warned_overtemperature = False
 
@@ -303,29 +324,28 @@ class SchneiderVsdApplication(Application):
 
         if self._prev_running is not None:
             if is_running and not self._prev_running and notif.on_start.value:
-                await self.create_message("notifications", {
-                    "title": f"{name} started",
-                    "message": f"{name} motor started",
-                    "body": f"Motor started at {status.frequency_hz:.1f} Hz",
-                    "severity": "info",
-                })
+                await self._notify(
+                    title=f"{name} started",
+                    message=(
+                        f"{name} motor started at {status.frequency_hz:.1f} Hz"
+                    ),
+                    severity=NotificationSeverity.Info,
+                )
             elif not is_running and self._prev_running and notif.on_stop.value:
-                await self.create_message("notifications", {
-                    "title": f"{name} stopped",
-                    "message": f"{name} motor stopped",
-                    "body": "Motor stopped",
-                    "severity": "info",
-                })
+                await self._notify(
+                    title=f"{name} stopped",
+                    message=f"{name} motor stopped",
+                    severity=NotificationSeverity.Info,
+                )
 
         if self._prev_faulted is not None:
             if is_faulted and not self._prev_faulted and notif.on_fault.value:
                 fault_desc = (status.fault_description or "").strip() or "Unknown fault"
-                await self.create_message("notifications", {
-                    "title": f"{name} fault",
-                    "message": f"{name} fault: {fault_desc}",
-                    "body": f"Drive faulted: {fault_desc}",
-                    "severity": "error",
-                })
+                await self._notify(
+                    title=f"{name} fault",
+                    message=f"{name} drive faulted: {fault_desc}",
+                    severity=NotificationSeverity.Critical,
+                )
 
         self._prev_running = is_running
         self._prev_faulted = is_faulted
