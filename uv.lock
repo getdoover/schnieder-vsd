@@ -485,15 +485,15 @@ wheels = [
 
 [[package]]
 name = "pydoover"
-version = "1.5.0"
+version = "1.11.4"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "aiohttp" },
     { name = "httpx" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/04/6b/4981817cc256185a5ac25f134ea407e49fcbfdc366cad4c821860353743e/pydoover-1.5.0.tar.gz", hash = "sha256:2fdcd2322d85106017af5d83f9397ae83e61c96880560fa051c299f1a90f3006", size = 540257, upload-time = "2026-06-10T06:28:33.118Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/7e/15/854ca9e53cb844dd353db5359e6e7934f1ad80f9df2d7460fbdc963be585/pydoover-1.11.4.tar.gz", hash = "sha256:e0ed49b11a885f6b3f170d9dd41d001e9d312374c17e6116db796616a6478b25", size = 559538, upload-time = "2026-07-27T01:35:59.946Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/6f/55/c16d5e0aefaf242091f3cc4dd2cf9aa34ca57bf5455f431064c1cf29848c/pydoover-1.5.0-py3-none-any.whl", hash = "sha256:19491e5548f46db73e4909ad12477cc9dd2d33cdbf5fa8f7a7b8fa52a78b5d15", size = 277923, upload-time = "2026-06-10T06:28:34.5Z" },
+    { url = "https://files.pythonhosted.org/packages/8e/b4/2dbc47b29aca1a44371f233cfe711d53fa17e6a2a617181d4af29abfd2a0/pydoover-1.11.4-py3-none-any.whl", hash = "sha256:ef768bf25285cebcff0fd1e1caa3c179d66aeb557b9fd063b0fc866ad148c75c", size = 296095, upload-time = "2026-07-27T01:35:58.717Z" },
 ]
 
 [[package]]
@@ -552,7 +552,7 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "pydoover", specifier = ">=1.5.0" },
+    { name = "pydoover", specifier = ">=1.11.4" },
     { name = "pymodbus", specifier = ">=3.11.4" },
 ]
 
